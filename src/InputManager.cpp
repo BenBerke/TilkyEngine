@@ -1,34 +1,67 @@
 #include "../Headers/InputManager.h"
-#include <cstring>
+#include <algorithm>
 
-const bool *InputManager::keyboardState = nullptr;
-Uint8 InputManager::prevKeyboardState[SDL_SCANCODE_COUNT] = {0};
+namespace {
+    const bool* keyboardState = nullptr;
+    bool prevKeyboardState[SDL_SCANCODE_COUNT] = {};
 
-void InputManager::BeginFrame()
-{
-    if (!keyboardState)
-    {
+    SDL_MouseButtonFlags mouseState = 0;
+    SDL_MouseButtonFlags prevMouseState = 0;
+
+    Vector2 mousePosition{};
+    Vector2 prevMousePosition{};
+}
+
+namespace InputManager {
+
+    void BeginFrame() {
+        if (!keyboardState) {
+            SDL_PumpEvents();
+            keyboardState = SDL_GetKeyboardState(nullptr);
+        }
+
+        std::copy_n(keyboardState, SDL_SCANCODE_COUNT, prevKeyboardState);
+
+        prevMouseState = mouseState;
+        prevMousePosition = mousePosition;
+
         SDL_PumpEvents();
+
         keyboardState = SDL_GetKeyboardState(nullptr);
+        mouseState = SDL_GetMouseState(&mousePosition.x, &mousePosition.y);
     }
 
-    std::memcpy(prevKeyboardState, keyboardState, SDL_SCANCODE_COUNT * sizeof(Uint8));
+    bool GetKeyDown(SDL_Scancode key) {
+        return keyboardState[key] && !prevKeyboardState[key];
+    }
 
-    SDL_PumpEvents();
-    keyboardState = SDL_GetKeyboardState(nullptr);
-}
+    bool GetKey(SDL_Scancode key) {
+        return keyboardState[key];
+    }
 
-bool InputManager::GetKeyDown(SDL_Scancode key)
-{
-    return keyboardState[key] && !prevKeyboardState[key];
-}
+    bool GetKeyUp(SDL_Scancode key) {
+        return !keyboardState[key] && prevKeyboardState[key];
+    }
 
-bool InputManager::GetKey(SDL_Scancode key)
-{
-    return keyboardState[key];
-}
+    bool GetMouseButtonDown(Uint32 button) {
+        return (mouseState & SDL_BUTTON_MASK(button)) &&
+               !(prevMouseState & SDL_BUTTON_MASK(button));
+    }
 
-bool InputManager::GetKeyUp(SDL_Scancode key)
-{
-    return !keyboardState[key] && prevKeyboardState[key];
+    bool GetMouseButton(Uint32 button) {
+        return (mouseState & SDL_BUTTON_MASK(button)) != 0;
+    }
+
+    bool GetMouseButtonUp(Uint32 button) {
+        return !(mouseState & SDL_BUTTON_MASK(button)) &&
+                (prevMouseState & SDL_BUTTON_MASK(button));
+    }
+
+    Vector2 GetMousePosition() {
+        return mousePosition;
+    }
+
+    Vector2 GetMouseDelta() {
+        return mousePosition - prevMousePosition;
+    }
 }

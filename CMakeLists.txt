@@ -14,6 +14,9 @@ add_executable(TilkyEngine
         Headers/InputManager.h
         src/InputManager.cpp
         Headers/Vector.h
+        src/Player.cpp
+        Headers/Player.h
+        Headers/GameTime.h
 )
 
 target_link_libraries(TilkyEngine PRIVATE

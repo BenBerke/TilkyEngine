@@ -1,14 +1,18 @@
 #pragma once
 #include <SDL3/SDL.h>
+#include "Vector.h"
 
-class InputManager {
-public:
-    static void BeginFrame();
-    static bool GetKeyDown(SDL_Scancode key);
-    static bool GetKey(SDL_Scancode key);
-    static bool GetKeyUp(SDL_Scancode key);
+namespace InputManager {
+    void BeginFrame();
 
-private:
-    static const bool *keyboardState;
-    static Uint8 prevKeyboardState[SDL_SCANCODE_COUNT];
-};
+    bool GetKeyDown(SDL_Scancode key);
+    bool GetKey(SDL_Scancode key);
+    bool GetKeyUp(SDL_Scancode key);
+
+    bool GetMouseButtonDown(Uint32 button);
+    bool GetMouseButton(Uint32 button);
+    bool GetMouseButtonUp(Uint32 button);
+
+    Vector2 GetMousePosition();
+    Vector2 GetMouseDelta();
+}

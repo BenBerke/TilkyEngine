@@ -24,6 +24,11 @@ struct Vector2{
         y *= other.y;
         return *this;
     }
+    Vector2 operator*=(const float val) {
+        x *= val;
+        y *= val;
+        return *this;
+    }
     Vector2 operator/=(const Vector2& other) {
         x /= other.x;
         y /= other.y;
