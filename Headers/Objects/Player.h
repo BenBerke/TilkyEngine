@@ -5,10 +5,7 @@
 #ifndef TILKYENGINE_PLAYER_H
 #define TILKYENGINE_PLAYER_H
 
-#include "Vector.h"
-#include "GameTime.h"
-
-#define FRICTION .8f
+#include "../Math/Vector.h"
 
 class Player {
 private:
@@ -17,18 +14,19 @@ private:
     Vector2 position;
     float speed;
     float size;
+    float angle;
 
 public:
     explicit Player(const Vector2 pos = {0, 0}, const float speed = 50.0f, const float size = 10.0f)
     : velocity(0.0f, 0.0f), position(pos), speed(speed), size(size) {}
-    void Update() {
-        position += velocity.Normalized() * GameTime::deltaTime * speed;
-        velocity *= FRICTION;
-    }
+    void Update();
 
     void SetVelocity(const Vector2 vel) { velocity = vel; }
     [[nodiscard]] Vector2 GetVelocity() { return velocity; }
     [[nodiscard]] Vector2 GetPosition() const { return position; }
+
+    [[nodiscard]] float GetSize() const { return size; }
+    [[nodiscard]] float GetAngle() const { return angle;}
 };
 
 

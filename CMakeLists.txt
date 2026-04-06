@@ -10,13 +10,20 @@ find_package(SDL3_ttf REQUIRED CONFIG)
 
 add_executable(TilkyEngine
         main.cpp
-        config.h
-        Headers/InputManager.h
-        src/InputManager.cpp
-        Headers/Vector.h
-        src/Player.cpp
-        Headers/Player.h
-        Headers/GameTime.h
+        Headers/Engine/InputManager.h
+        src/Engine/InputManager.cpp
+        Headers/Math/Vector.h
+        src/Objects/Player.cpp
+        Headers/Objects/Player.h
+        Headers/Engine/GameTime.h
+        src/Renderer/BSP.cpp
+        Headers/Renderer/BSP.h
+        src/Renderer/MapEditor.cpp
+        Headers/Renderer/MapEditor.h
+        Headers/Objects/Wall.h
+        Headers/Renderer/Renderer.h
+        src/Renderer/Renderer.cpp
+        src/Engine/GameTime.cpp
 )
 
 target_link_libraries(TilkyEngine PRIVATE

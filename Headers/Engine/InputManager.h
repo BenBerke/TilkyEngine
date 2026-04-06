@@ -1,6 +1,6 @@
 #pragma once
 #include <SDL3/SDL.h>
-#include "Vector.h"
+#include "../Math/Vector.h"
 
 namespace InputManager {
     void BeginFrame();

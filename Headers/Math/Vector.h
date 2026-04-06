@@ -51,6 +51,9 @@ struct Vector2{
     [[nodiscard]] float Dot(const Vector2& other) const{
         return x * other.x + y * other.y;
     }
+    [[nodiscard]] float Cross(const Vector2& other) const {
+        return x * other.y - y * other.x;
+    }
 };
 
 struct Vector3{
