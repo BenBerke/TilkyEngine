@@ -43,13 +43,13 @@ namespace Renderer {
         SDL_RenderLine(renderer, start.x, start.y, end.x, end.y);
     }
 
-    void UpdateFrame(const Player& player, const std::vector<Wall>& walls) {
+    void UpdateFrame(const Player& player, const std::vector<Wall>& walls, const std::vector<Sector> sectors) {
     const float centreX = SCREEN_WIDTH * 0.5f;
     const float centreY = SCREEN_HEIGHT * 0.5f;
 
     const float focalLength = 400.0f;
     const float nearPlane = 1.0f;
-    const float wallHeight = 100.0f;
+    constexpr float eyeHeight = 25.0f;
 
     const float angle = player.GetAngle();
 
@@ -59,11 +59,10 @@ namespace Renderer {
     Vector2 screenCentre = { centreX, centreY };
 
     // ---------- 3D WALL PASS ----------
-    SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-
-    for (const auto& [start, end] : walls) {
-        Vector2 relStart = start - player.GetPosition();
-        Vector2 relEnd   = end   - player.GetPosition();
+    for (const Wall& wall : walls) {
+        SDL_SetRenderDrawColor(renderer, wall.color.x, wall.color.y, wall.color.z, 255);
+        Vector2 relStart = wall.start - player.GetPosition();
+        Vector2 relEnd   = wall.end   - player.GetPosition();
 
         Vector2 camStart = {
             relStart.x * right.x + relStart.y * right.y,
@@ -97,43 +96,72 @@ namespace Renderer {
         float screenX1 = centreX + (x1 * focalLength) / z1;
         float screenX2 = centreX + (x2 * focalLength) / z2;
 
-        float projectedHeight1 = (wallHeight * focalLength) / z1;
-        float projectedHeight2 = (wallHeight * focalLength) / z2;
+        if (wall.frontSector < 0 || wall.frontSector >= static_cast<int>(sectors.size())) continue;
+        const Sector& front = sectors[wall.frontSector];
 
-        float topY1 = centreY - projectedHeight1 * 0.5f;
-        float botY1 = centreY + projectedHeight1 * 0.5f;
+        auto ProjectY = [&](float worldHeight, float depth) {
+            return centreY - ((worldHeight - eyeHeight) * focalLength) / depth;
+        };
 
-        float topY2 = centreY - projectedHeight2 * 0.5f;
-        float botY2 = centreY + projectedHeight2 * 0.5f;
+        auto DrawSpan = [&](float ceil1, float floor1, float ceil2, float floor2) {
+            float topY1 = ProjectY(ceil1, z1);
+            float botY1 = ProjectY(floor1, z1);
 
-        if (screenX1 > screenX2) {
-            std::swap(screenX1, screenX2);
-            std::swap(topY1, topY2);
-            std::swap(botY1, botY2);
-        }
+            float topY2 = ProjectY(ceil2, z2);
+            float botY2 = ProjectY(floor2, z2);
 
-        int xStart = std::max(0, static_cast<int>(std::ceil(screenX1)));
-        int xEnd   = std::min(SCREEN_WIDTH - 1, static_cast<int>(std::floor(screenX2)));
+            float drawScreenX1 = screenX1;
+            float drawScreenX2 = screenX2;
 
-        if (xEnd < xStart) continue;
+            if (drawScreenX1 > drawScreenX2) {
+                std::swap(drawScreenX1, drawScreenX2);
+                std::swap(topY1, topY2);
+                std::swap(botY1, botY2);
+            }
 
-        for (int x = xStart; x <= xEnd; x++) {
-            float t = (x - screenX1) / (screenX2 - screenX1);
+            if (drawScreenX2 == drawScreenX1) return;
 
-            float topY = topY1 + (topY2 - topY1) * t;
-            float botY = botY1 + (botY2 - botY1) * t;
+            int xStart = std::max(0, static_cast<int>(std::ceil(drawScreenX1)));
+            int xEnd   = std::min(SCREEN_WIDTH - 1, static_cast<int>(std::floor(drawScreenX2)));
 
-            SDL_RenderLine(renderer, static_cast<float>(x), topY,
-                                     static_cast<float>(x), botY);
+            if (xEnd < xStart) return;
+
+            for (int x = xStart; x <= xEnd; x++) {
+                float t = (x - drawScreenX1) / (drawScreenX2 - drawScreenX1);
+
+                float topY = topY1 + (topY2 - topY1) * t;
+                float botY = botY1 + (botY2 - botY1) * t;
+
+                SDL_RenderLine(renderer, static_cast<float>(x), topY,
+                               static_cast<float>(x), botY);
+            }
+        };
+
+        if (wall.backSector == -1) {
+            DrawSpan(front.ceilingHeight, front.floorHeight,
+                     front.ceilingHeight, front.floorHeight);
+        } else {
+            if (wall.backSector < 0 || wall.backSector >= static_cast<int>(sectors.size())) continue;
+            const Sector& back = sectors[wall.backSector];
+
+            if (back.floorHeight > front.floorHeight) {
+                DrawSpan(back.floorHeight, front.floorHeight,
+                         back.floorHeight, front.floorHeight);
+            }
+
+            if (back.ceilingHeight < front.ceilingHeight) {
+                DrawSpan(front.ceilingHeight, back.ceilingHeight,
+                         front.ceilingHeight, back.ceilingHeight);
+            }
         }
     }
 
     // ---------- TOP-DOWN DEBUG PASS ----------
     SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
 
-    for (const auto& [start, end] : walls) {
-        Vector2 relativeStart = start - player.GetPosition();
-        Vector2 relativeEnd   = end   - player.GetPosition();
+    for (const Wall& wall : walls) {
+        Vector2 relativeStart = wall.start - player.GetPosition();
+        Vector2 relativeEnd   = wall.end   - player.GetPosition();
 
         Vector2 screenStart = {
             screenCentre.x + relativeStart.x,
@@ -159,7 +187,6 @@ namespace Renderer {
     };
     SDL_RenderFillRect(renderer, &pRect);
 
-    // Facing direction line
     SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
 
     Vector2 facingEnd = {

@@ -24,6 +24,7 @@ add_executable(TilkyEngine
         Headers/Renderer/Renderer.h
         src/Renderer/Renderer.cpp
         src/Engine/GameTime.cpp
+        Headers/Objects/Sector.h
 )
 
 target_link_libraries(TilkyEngine PRIVATE
