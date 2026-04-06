@@ -22,11 +22,6 @@ int main() {
     std::unique_ptr<BSPNode> bspTree = nullptr;
     Player player((Vector2){125, 125});
 
-    bool editing = true;
-
-    Vector2 firstClick;
-    Vector2 secondClick;
-
     Sector s1 = {0, 90};
     Sector s2 = {0, 75};
 
@@ -56,6 +51,8 @@ int main() {
     MapEditor::CreateWallDirectly(w6);
     MapEditor::CreateWallDirectly(w7);
 
+    if (!MapEditor::walls.empty()) bspTree = BSPNode::BuildTree(MapEditor::walls);
+
     bool running = true;
     while (running) {
         Renderer::BeginFrame();
@@ -65,33 +62,10 @@ int main() {
 
         if (InputManager::GetKeyDown(SDL_SCANCODE_ESCAPE)) running = false;
 
-        if (InputManager::GetKeyDown(SDL_SCANCODE_B)) {
-            if (!MapEditor::walls.empty()) bspTree = BSPNode::BuildTree(MapEditor::walls);
-            std::cout << "Tree built" << std::endl;
-        }
-
-        if (InputManager::GetMouseButtonDown(SDL_BUTTON_LEFT)) {
-            firstClick = InputManager::GetMousePosition();
-            firstClick.x = firstClick.x + player.GetPosition().x - SCREEN_WIDTH / 2.0f;
-            firstClick.y = player.GetPosition().y + SCREEN_HEIGHT / 2.0f - firstClick.y;
-        }
-
-        if (InputManager::GetMouseButtonDown(SDL_BUTTON_RIGHT)) {
-            secondClick = InputManager::GetMousePosition();
-            secondClick.x = secondClick.x + player.GetPosition().x - SCREEN_WIDTH / 2.0f;
-            secondClick.y = player.GetPosition().y + SCREEN_HEIGHT / 2.0f - secondClick.y;
-        }
-
-        if (InputManager::GetKeyDown(SDL_SCANCODE_R)) {
-            MapEditor::CreateWall(firstClick, secondClick);
-        }
-
-
         std::vector<Wall> renderOrder;
         TraverseTree(bspTree.get(), player.GetPosition(), renderOrder);
 
-        if (bspTree) Renderer::UpdateFrame(player, renderOrder, MapEditor::sectors);
-        else Renderer::UpdateFrame(player, MapEditor::walls, MapEditor::sectors);
+        Renderer::UpdateFrame(player, renderOrder, MapEditor::sectors);
     }
 
     return 0;
