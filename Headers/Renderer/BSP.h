@@ -13,6 +13,7 @@
 
 struct BSPNode {
     Wall partition;
+    std::vector<Wall> coplanarWalls;
     std::unique_ptr<BSPNode> front, back;
 
     static std::unique_ptr<BSPNode> BuildTree(const std::vector<Wall>& walls);

@@ -1,6 +1,20 @@
 #include "../../Headers/Renderer/BSP.h"
 
 #include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <limits>
+
+static constexpr float EPSILON = 0.0001f;
+static constexpr float MIN_FRAGMENT_LENGTH = 0.5f;
+static constexpr float MIN_FRAGMENT_LENGTH_SQ = MIN_FRAGMENT_LENGTH * MIN_FRAGMENT_LENGTH;
+
+enum class WallClassification {
+    Coplanar,
+    Front,
+    Back,
+    Spanning
+};
 
 static float PointSide(const Wall& partition, const Vector2& point) {
     Vector2 line = {
@@ -16,38 +30,181 @@ static float PointSide(const Wall& partition, const Vector2& point) {
     return line.Cross(toPoint);
 }
 
+static Vector2 Lerp(const Vector2& a, const Vector2& b, float t) {
+    return {
+        a.x + (b.x - a.x) * t,
+        a.y + (b.y - a.y) * t
+    };
+}
+
+static float WallLengthSq(const Wall& wall) {
+    float dx = wall.end.x - wall.start.x;
+    float dy = wall.end.y - wall.start.y;
+    return dx * dx + dy * dy;
+}
+
+static bool IsTinyFragment(const Wall& wall) {
+    return WallLengthSq(wall) <= MIN_FRAGMENT_LENGTH_SQ;
+}
+
+static WallClassification ClassifyWall(const Wall& partition, const Wall& wall) {
+    float startSide = PointSide(partition, wall.start);
+    float endSide   = PointSide(partition, wall.end);
+
+    bool startOn = std::fabs(startSide) <= EPSILON;
+    bool endOn   = std::fabs(endSide) <= EPSILON;
+
+    bool startFront = startSide > EPSILON;
+    bool startBack  = startSide < -EPSILON;
+    bool endFront   = endSide > EPSILON;
+    bool endBack    = endSide < -EPSILON;
+
+    if (startOn && endOn) {
+        return WallClassification::Coplanar;
+    }
+
+    if ((startFront || startOn) && (endFront || endOn)) {
+        return WallClassification::Front;
+    }
+
+    if ((startBack || startOn) && (endBack || endOn)) {
+        return WallClassification::Back;
+    }
+
+    return WallClassification::Spanning;
+}
+
+static void SplitWall(const Wall& partition, const Wall& wall, Wall& frontPiece, Wall& backPiece) {
+    float startSide = PointSide(partition, wall.start);
+    float endSide   = PointSide(partition, wall.end);
+
+    float t = startSide / (startSide - endSide);
+    Vector2 splitPoint = Lerp(wall.start, wall.end, t);
+
+    if (startSide > 0.0f) {
+        frontPiece = wall;
+        frontPiece.start = wall.start;
+        frontPiece.end   = splitPoint;
+
+        backPiece = wall;
+        backPiece.start = splitPoint;
+        backPiece.end   = wall.end;
+    }
+    else {
+        backPiece = wall;
+        backPiece.start = wall.start;
+        backPiece.end   = splitPoint;
+
+        frontPiece = wall;
+        frontPiece.start = splitPoint;
+        frontPiece.end   = wall.end;
+    }
+}
+
+static size_t ChooseBestSplitter(const std::vector<Wall>& walls) {
+    size_t bestIndex = 0;
+    float bestScore = std::numeric_limits<float>::infinity();
+
+    for (size_t i = 0; i < walls.size(); i++) {
+        const Wall& candidate = walls[i];
+
+        int frontCount = 0;
+        int backCount = 0;
+        int splitCount = 0;
+        int coplanarCount = 0;
+
+        for (size_t j = 0; j < walls.size(); j++) {
+            if (i == j) continue;
+
+            switch (ClassifyWall(candidate, walls[j])) {
+                case WallClassification::Front:
+                    frontCount++;
+                    break;
+                case WallClassification::Back:
+                    backCount++;
+                    break;
+                case WallClassification::Spanning:
+                    splitCount++;
+                    break;
+                case WallClassification::Coplanar:
+                    coplanarCount++;
+                    break;
+            }
+        }
+
+        float balancePenalty = static_cast<float>(std::abs(frontCount - backCount));
+        float splitPenalty = static_cast<float>(splitCount) * 8.0f;
+        float coplanarPenalty = static_cast<float>(coplanarCount) * 0.25f;
+
+        float score = splitPenalty + balancePenalty + coplanarPenalty;
+
+        if (score < bestScore) {
+            bestScore = score;
+            bestIndex = i;
+        }
+    }
+
+    return bestIndex;
+}
+
 std::unique_ptr<BSPNode> BSPNode::BuildTree(const std::vector<Wall>& walls) {
     if (walls.empty()) return nullptr;
 
     auto node = std::make_unique<BSPNode>();
-    node->partition = walls[0];
 
-    std::vector<Wall> frontWalls, backWalls;
+    size_t splitterIndex = ChooseBestSplitter(walls);
+    node->partition = walls[splitterIndex];
+    node->coplanarWalls.push_back(walls[splitterIndex]);
 
-    for (size_t i = 1; i < walls.size(); i++) {
+    std::vector<Wall> frontWalls;
+    std::vector<Wall> backWalls;
+
+    for (size_t i = 0; i < walls.size(); i++) {
+        if (i == splitterIndex) continue;
+
         const Wall& current = walls[i];
-        float startSide = PointSide(node->partition, current.start);
-        float endSide = PointSide(node->partition, current.end);
 
-        if (startSide >= 0 && endSide >= 0) {
-            frontWalls.push_back(current);
-        }
-        else if (startSide <= 0 && endSide <= 0) {
-            backWalls.push_back(current);
-        }
-        else {
-            frontWalls.push_back(current);
+        switch (ClassifyWall(node->partition, current)) {
+            case WallClassification::Coplanar:
+                node->coplanarWalls.push_back(current);
+                break;
+
+            case WallClassification::Front:
+                frontWalls.push_back(current);
+                break;
+
+            case WallClassification::Back:
+                backWalls.push_back(current);
+                break;
+
+            case WallClassification::Spanning: {
+                Wall frontPiece;
+                Wall backPiece;
+                SplitWall(node->partition, current, frontPiece, backPiece);
+
+                if (!IsTinyFragment(frontPiece)) {
+                    frontWalls.push_back(frontPiece);
+                }
+
+                if (!IsTinyFragment(backPiece)) {
+                    backWalls.push_back(backPiece);
+                }
+                break;
+            }
         }
     }
 
-    if (!frontWalls.empty()) node->front = BuildTree(frontWalls);
-    else {
+    if (!frontWalls.empty()) {
+        node->front = BuildTree(frontWalls);
+    } else {
         node->front = std::make_unique<BSPNode>();
         node->front->isLeaf = true;
         node->front->sectorId = node->partition.frontSector;
     }
-    if (!backWalls.empty()) node->back = BuildTree(backWalls);
-    else {
+
+    if (!backWalls.empty()) {
+        node->back = BuildTree(backWalls);
+    } else {
         node->back = std::make_unique<BSPNode>();
         node->back->isLeaf = true;
         node->back->sectorId = node->partition.backSector;
@@ -61,14 +218,23 @@ void TraverseTree(const BSPNode* node, const Vector2& playerPos, std::vector<Wal
     if (node->isLeaf) return;
 
     float side = PointSide(node->partition, playerPos);
+
     if (side >= 0) {
         TraverseTree(node->front.get(), playerPos, outWalls);
-        outWalls.push_back(node->partition);
+
+        for (const Wall& wall : node->coplanarWalls) {
+            outWalls.push_back(wall);
+        }
+
         TraverseTree(node->back.get(), playerPos, outWalls);
     }
     else {
         TraverseTree(node->back.get(), playerPos, outWalls);
-        outWalls.push_back(node->partition);
+
+        for (const Wall& wall : node->coplanarWalls) {
+            outWalls.push_back(wall);
+        }
+
         TraverseTree(node->front.get(), playerPos, outWalls);
     }
 }
