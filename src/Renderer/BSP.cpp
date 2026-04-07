@@ -58,17 +58,18 @@ std::unique_ptr<BSPNode> BSPNode::BuildTree(const std::vector<Wall>& walls) {
 
 void TraverseTree(const BSPNode* node, const Vector2& playerPos, std::vector<Wall>& outWalls) {
     if (!node) return;
+    if (node->isLeaf) return;
 
     float side = PointSide(node->partition, playerPos);
     if (side >= 0) {
-        TraverseTree(node->back.get(), playerPos, outWalls);
-        outWalls.push_back(node->partition);
         TraverseTree(node->front.get(), playerPos, outWalls);
+        outWalls.push_back(node->partition);
+        TraverseTree(node->back.get(), playerPos, outWalls);
     }
     else {
-        TraverseTree(node->front.get(), playerPos, outWalls);
-        outWalls.push_back(node->partition);
         TraverseTree(node->back.get(), playerPos, outWalls);
+        outWalls.push_back(node->partition);
+        TraverseTree(node->front.get(), playerPos, outWalls);
     }
 }
 

@@ -14,7 +14,7 @@
 namespace Renderer {
     bool Initialize();
     void BeginFrame();
-    void UpdateFrame(const Player& player, const std::vector<Wall>& walls, const std::vector<Sector> sectors);
+    void UpdateFrame(const Player& player, const std::vector<Wall>& walls, const std::vector<Sector>& sectors);
     void DrawLine(float x1, float y1, float x2, float y2);
 }
 

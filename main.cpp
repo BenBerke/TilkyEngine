@@ -64,7 +64,9 @@ int main() {
 
         std::vector<Wall> renderOrder;
         TraverseTree(bspTree.get(), player.GetPosition(), renderOrder);
-        int currentSector = FindPlayerSector(bspTree.get(), player.GetPosition());
+
+        player.SetCurrentSector(FindPlayerSector(bspTree.get(), player.GetPosition()));
+        player.SetCurrentEyeHeight(MapEditor::sectors[player.GetCurrentSector()].floorHeight + player.GetEyeHeight());
 
         Renderer::UpdateFrame(player, renderOrder, MapEditor::sectors);
     }
