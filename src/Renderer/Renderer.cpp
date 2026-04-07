@@ -10,8 +10,9 @@
 #include <SDL3/SDL_render.h>
 
 #include "../../Headers/Renderer/Renderer.h"
-
+#include "../../Headers/Renderer/BSP.h"
 #include <string>
+
 
 #include "../../Headers/Engine/GameTime.h"
 #include "../../Headers/Math/Vector.h"
@@ -19,9 +20,14 @@
 #define SCREEN_WIDTH 960
 #define SCREEN_HEIGHT 600
 
+struct VerticalFillCommand {
+    int x, y1, y2;
+    Vector3 color;
+};
+
 namespace {
-    SDL_Window* window = nullptr;
-    SDL_Renderer* renderer = nullptr;
+    SDL_Window *window = nullptr;
+    SDL_Renderer *renderer = nullptr;
 }
 
 namespace Renderer {
@@ -47,10 +53,13 @@ namespace Renderer {
         SDL_RenderLine(renderer, start.x, start.y, end.x, end.y);
     }
 
-    void UpdateFrame(const Player& player, const std::vector<Wall>& walls, const std::vector<Sector>& sectors) {
+    void UpdateFrame(const Player &player, const std::vector<Wall> &walls, const std::vector<Sector> &sectors) {
         int upperWallBounds[SCREEN_WIDTH] = {0};
         int lowerWallBounds[SCREEN_WIDTH];
-        std::fill_n(lowerWallBounds, SCREEN_WIDTH, SCREEN_HEIGHT-1);
+        std::fill_n(lowerWallBounds, SCREEN_WIDTH, SCREEN_HEIGHT - 1);
+
+        std::vector<VerticalFillCommand> fillCommands;
+        fillCommands.reserve(SCREEN_WIDTH * 8);
 
         const float centreX = SCREEN_WIDTH * 0.5f;
         const float centreY = SCREEN_HEIGHT * 0.5f;
@@ -60,16 +69,16 @@ namespace Renderer {
 
         const float angle = player.GetAngle();
 
-        Vector2 forward = { std::sin(angle), std::cos(angle) };
-        Vector2 right   = { std::cos(angle), -std::sin(angle) };
+        Vector2 forward = {std::sin(angle), std::cos(angle)};
+        Vector2 right = {std::cos(angle), -std::sin(angle)};
 
-        Vector2 screenCentre = { centreX, centreY };
+        Vector2 screenCentre = {centreX, centreY};
 
         // ---------- 3D WALL PASS ----------
-        for (const Wall& wall : walls) {
+        for (const Wall &wall: walls) {
             SDL_SetRenderDrawColor(renderer, wall.color.x, wall.color.y, wall.color.z, 255);
             Vector2 relStart = wall.start - player.GetPosition();
-            Vector2 relEnd   = wall.end   - player.GetPosition();
+            Vector2 relEnd = wall.end - player.GetPosition();
 
             Vector2 camStart = {
                 relStart.x * right.x + relStart.y * right.y,
@@ -104,7 +113,23 @@ namespace Renderer {
             float screenX2 = centreX + (x2 * focalLength) / z2;
 
             if (wall.frontSector < 0 || wall.frontSector >= static_cast<int>(sectors.size())) continue;
-            const Sector &front = sectors[wall.frontSector];
+
+            int currentSectorId = wall.frontSector;
+            int otherSectorId = wall.backSector;
+
+            float viewerSide = PointSide(wall, player.GetPosition());
+
+            // If the player is on the back side of the wall, swap them.
+            if (otherSectorId != -1 && viewerSide < 0.0f) {
+                std::swap(currentSectorId, otherSectorId);
+            }
+
+            const Sector &current = sectors[currentSectorId];
+            const Sector *other = nullptr;
+
+            if (otherSectorId >= 0 && otherSectorId < static_cast<int>(sectors.size())) {
+                other = &sectors[otherSectorId];
+            }
 
             auto ProjectY = [&](float worldHeight, float depth) {
                 return centreY - ((worldHeight - player.GetCurrentEyeHeight()) * focalLength) / depth;
@@ -116,7 +141,23 @@ namespace Renderer {
                 Upper
             };
 
-            auto DrawSpan = [&](float ceil1, float floor1, float ceil2, float floor2, SpanType type) {
+
+            auto QueueVFill = [&](int x, int y1, int y2, const Vector3 &color) {
+                if (y1 > y2) return;
+
+                y1 = std::max(0, y1);
+                y2 = std::min(SCREEN_HEIGHT - 1, y2);
+
+                if (y1 > y2) return;
+
+                fillCommands.push_back({x, y1, y2, color});
+            };
+
+            auto DrawSpan = [&](float ceil1, float floor1,
+                                float ceil2, float floor2,
+                                SpanType type,
+                                const Vector3 *fillAboveColor,
+                                const Vector3 *fillBelowColor) {
                 float topY1 = ProjectY(ceil1, z1);
                 float botY1 = ProjectY(floor1, z1);
 
@@ -151,7 +192,24 @@ namespace Renderer {
                     int clippedTop = std::max(static_cast<int>(std::ceil(topY)), upperWallBounds[x]);
                     int clippedBot = std::min(static_cast<int>(std::floor(botY)), lowerWallBounds[x]);
 
+                    int oldUpper = upperWallBounds[x];
+                    int oldLower = lowerWallBounds[x];
+
+                    if (fillAboveColor) {
+                        QueueVFill(x, oldUpper, clippedTop - 1, *fillAboveColor);
+                    }
+
+                    if (fillBelowColor) {
+                        QueueVFill(x, clippedBot + 1, oldLower, *fillBelowColor);
+                    }
+
                     if (clippedTop <= clippedBot) {
+                        SDL_SetRenderDrawColor(renderer,
+                                               static_cast<Uint8>(wall.color.x),
+                                               static_cast<Uint8>(wall.color.y),
+                                               static_cast<Uint8>(wall.color.z),
+                                               255);
+
                         SDL_RenderLine(renderer,
                                        static_cast<float>(x), static_cast<float>(clippedTop),
                                        static_cast<float>(x), static_cast<float>(clippedBot));
@@ -170,26 +228,56 @@ namespace Renderer {
                 }
             };
 
-            if (wall.backSector == -1) {
-                DrawSpan(front.ceilingHeight, front.floorHeight,
-                         front.ceilingHeight, front.floorHeight,
-                         SpanType::Solid);
+            if (other == nullptr) {
+                DrawSpan(current.ceilingHeight, current.floorHeight,
+                         current.ceilingHeight, current.floorHeight,
+                         SpanType::Solid,
+                         &current.ceilingColor,
+                         &current.floorColor);
             } else {
-                if (wall.backSector < 0 || wall.backSector >= static_cast<int>(sectors.size())) continue;
-                const Sector& back = sectors[wall.backSector];
+                const Sector& a = current;
+                const Sector& b = *other;
 
-                if (back.floorHeight > front.floorHeight) {
-                    DrawSpan(back.floorHeight, front.floorHeight,
-                             back.floorHeight, front.floorHeight,
-                             SpanType::Lower);
+                const Sector& lowerFloorSector =
+                    (a.floorHeight <= b.floorHeight) ? a : b;
+
+                const Sector& higherCeilingSector =
+                    (a.ceilingHeight >= b.ceilingHeight) ? a : b;
+
+                if (a.floorHeight != b.floorHeight) {
+                    float lowerMin = std::min(a.floorHeight, b.floorHeight);
+                    float lowerMax = std::max(a.floorHeight, b.floorHeight);
+
+                    DrawSpan(lowerMax, lowerMin,
+                             lowerMax, lowerMin,
+                             SpanType::Lower,
+                             nullptr,
+                             &lowerFloorSector.floorColor);
                 }
 
-                if (back.ceilingHeight < front.ceilingHeight) {
-                    DrawSpan(front.ceilingHeight, back.ceilingHeight,
-                             front.ceilingHeight, back.ceilingHeight,
-                             SpanType::Upper);
+                if (a.ceilingHeight != b.ceilingHeight) {
+                    float upperMin = std::min(a.ceilingHeight, b.ceilingHeight);
+                    float upperMax = std::max(a.ceilingHeight, b.ceilingHeight);
+
+                    DrawSpan(upperMax, upperMin,
+                             upperMax, upperMin,
+                             SpanType::Upper,
+                             &higherCeilingSector.ceilingColor,
+                             nullptr);
                 }
             }
+        }
+
+        for (const VerticalFillCommand &cmd: fillCommands) {
+            SDL_SetRenderDrawColor(renderer,
+                                   static_cast<Uint8>(cmd.color.x),
+                                   static_cast<Uint8>(cmd.color.y),
+                                   static_cast<Uint8>(cmd.color.z),
+                                   255);
+
+            SDL_RenderLine(renderer,
+                           static_cast<float>(cmd.x), static_cast<float>(cmd.y1),
+                           static_cast<float>(cmd.x), static_cast<float>(cmd.y2));
         }
 
         // ---------- TOP-DOWN DEBUG PASS ----------
@@ -237,6 +325,6 @@ namespace Renderer {
         SDL_SetRenderScale(renderer, 1.0f, 1.0f);
 
 
-         SDL_RenderPresent(renderer);
+        SDL_RenderPresent(renderer);
     }
 }

@@ -16,13 +16,14 @@ private:
     float size;
     float angle;
     float eyeHeight;
+    float stepSpeed;
 
     int currentSector{};
     float currentEyeHeight{};
 
 public:
     explicit Player(const Vector2 pos = {0, 0}, const float speed = 50.0f, const float size = 10.0f)
-    : velocity(0.0f, 0.0f), position(pos), speed(speed), size(size), angle(0.0f), eyeHeight(25.0f) {}
+    : velocity(0.0f, 0.0f), position(pos), speed(speed), size(size), angle(0.0f), eyeHeight(25.0f), stepSpeed(150.0f) {}
     void Update();
 
     void SetVelocity(const Vector2 vel) { velocity = vel; }
@@ -35,6 +36,7 @@ public:
     [[nodiscard]] float GetSize() const { return size; }
     [[nodiscard]] float GetAngle() const { return angle;}
     [[nodiscard]] float GetEyeHeight() const { return eyeHeight; }
+    [[nodiscard]] float GetStepSpeed() const { return stepSpeed; }
 
     [[nodiscard]] int GetCurrentSector() const { return currentSector; }
     [[nodiscard]] float GetCurrentEyeHeight() const { return currentEyeHeight; }

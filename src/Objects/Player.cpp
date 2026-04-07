@@ -5,15 +5,20 @@
 #include "../../Headers/Objects/Player.h"
 
 #include <iostream>
-#include <ostream>
+
 
 #include "../../Headers/Engine/InputManager.h"
 #include "../../Headers/Engine/GameTime.h"
+#include "../../Headers/Renderer/MapEditor.h"
 
 #define FRICTION .8f
 #define TURN_SPEED 2.0f
 
 void Player::Update() {
+    if (GetCurrentEyeHeight() < MapEditor::sectors[GetCurrentSector()].floorHeight + GetEyeHeight())
+        SetCurrentEyeHeight(GetCurrentEyeHeight() + GetStepSpeed() * GameTime::deltaTime);
+    else SetCurrentEyeHeight(GetCurrentEyeHeight() - GetStepSpeed() * GameTime::deltaTime);
+
     Vector2 input = {0.0f, 0.0f};
 
     if (InputManager::GetKey(SDL_SCANCODE_W)) input.y += 1.0f;

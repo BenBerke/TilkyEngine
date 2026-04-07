@@ -2,12 +2,13 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <limits>
+#include <unordered_map>
 
 static constexpr float EPSILON = 0.0001f;
 static constexpr float MIN_FRAGMENT_LENGTH = 0.5f;
 static constexpr float MIN_FRAGMENT_LENGTH_SQ = MIN_FRAGMENT_LENGTH * MIN_FRAGMENT_LENGTH;
+static constexpr size_t MAX_SUBSECTOR_WALLS = 2;
 
 enum class WallClassification {
     Coplanar,
@@ -16,7 +17,7 @@ enum class WallClassification {
     Spanning
 };
 
-static float PointSide(const Wall& partition, const Vector2& point) {
+float PointSide(const Wall& partition, const Vector2& point) {
     Vector2 line = {
         partition.end.x - partition.start.x,
         partition.end.y - partition.start.y
@@ -147,8 +148,45 @@ static size_t ChooseBestSplitter(const std::vector<Wall>& walls) {
     return bestIndex;
 }
 
+static int ChooseDominantSector(const std::vector<Wall>& walls) {
+    std::unordered_map<int, int> counts;
+
+    for (const Wall& wall : walls) {
+        if (wall.frontSector >= 0) counts[wall.frontSector]++;
+        if (wall.backSector >= 0) counts[wall.backSector]++;
+    }
+
+    int bestSector = -1;
+    int bestCount = -1;
+
+    for (const auto& [sectorId, count] : counts) {
+        if (count > bestCount) {
+            bestCount = count;
+            bestSector = sectorId;
+        }
+    }
+
+    return bestSector;
+}
+
+static std::unique_ptr<BSPNode> MakeSubsectorLeaf(const std::vector<Wall>& walls) {
+    auto leaf = std::make_unique<BSPNode>();
+    leaf->isLeaf = true;
+    leaf->subsector = std::make_unique<Subsector>();
+    leaf->subsector->walls = walls;
+    leaf->subsector->sectorId = ChooseDominantSector(walls);
+    leaf->sectorId = leaf->subsector->sectorId;
+    return leaf;
+}
+
 std::unique_ptr<BSPNode> BSPNode::BuildTree(const std::vector<Wall>& walls) {
     if (walls.empty()) return nullptr;
+
+    // First-pass subsector stopping rule.
+    // This is not a full Doom subsector builder, but it gives real leaf wall sets.
+    if (walls.size() <= MAX_SUBSECTOR_WALLS) {
+        return MakeSubsectorLeaf(walls);
+    }
 
     auto node = std::make_unique<BSPNode>();
 
@@ -199,6 +237,8 @@ std::unique_ptr<BSPNode> BSPNode::BuildTree(const std::vector<Wall>& walls) {
     } else {
         node->front = std::make_unique<BSPNode>();
         node->front->isLeaf = true;
+        node->front->subsector = std::make_unique<Subsector>();
+        node->front->subsector->sectorId = node->partition.frontSector;
         node->front->sectorId = node->partition.frontSector;
     }
 
@@ -207,6 +247,8 @@ std::unique_ptr<BSPNode> BSPNode::BuildTree(const std::vector<Wall>& walls) {
     } else {
         node->back = std::make_unique<BSPNode>();
         node->back->isLeaf = true;
+        node->back->subsector = std::make_unique<Subsector>();
+        node->back->subsector->sectorId = node->partition.backSector;
         node->back->sectorId = node->partition.backSector;
     }
 
@@ -215,7 +257,15 @@ std::unique_ptr<BSPNode> BSPNode::BuildTree(const std::vector<Wall>& walls) {
 
 void TraverseTree(const BSPNode* node, const Vector2& playerPos, std::vector<Wall>& outWalls) {
     if (!node) return;
-    if (node->isLeaf) return;
+
+    if (node->isLeaf) {
+        if (node->subsector) {
+            for (const Wall& wall : node->subsector->walls) {
+                outWalls.push_back(wall);
+            }
+        }
+        return;
+    }
 
     float side = PointSide(node->partition, playerPos);
 
@@ -247,4 +297,14 @@ int FindPlayerSector(const BSPNode* node, const Vector2& playerPos) {
 
     if (side >= 0) return FindPlayerSector(node->front.get(), playerPos);
     return FindPlayerSector(node->back.get(), playerPos);
+}
+
+const Subsector* FindPlayerSubsector(const BSPNode* node, const Vector2& playerPos) {
+    if (!node) return nullptr;
+    if (node->isLeaf) return node->subsector.get();
+
+    float side = PointSide(node->partition, playerPos);
+
+    if (side >= 0) return FindPlayerSubsector(node->front.get(), playerPos);
+    return FindPlayerSubsector(node->back.get(), playerPos);
 }

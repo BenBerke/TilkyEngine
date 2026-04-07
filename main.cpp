@@ -22,8 +22,8 @@ int main() {
     std::unique_ptr<BSPNode> bspTree = nullptr;
     Player player((Vector2){125, 125});
 
-    Sector s1 = {0, 90};
-    Sector s2 = {20, 75};
+    Sector s1 = {0, 90, (Vector3){100, 150, 50}, (Vector3){100, 150, 90}};
+    Sector s2 = {20, 75, (Vector3){20, 150, 50}, (Vector3){100, 0, 50}};
 
     MapEditor::CreateSectorDirectly(s1); // sector 0
     MapEditor::CreateSectorDirectly(s2); // sector 1
@@ -64,9 +64,7 @@ int main() {
 
         std::vector<Wall> renderOrder;
         TraverseTree(bspTree.get(), player.GetPosition(), renderOrder);
-
         player.SetCurrentSector(FindPlayerSector(bspTree.get(), player.GetPosition()));
-        player.SetCurrentEyeHeight(MapEditor::sectors[player.GetCurrentSector()].floorHeight + player.GetEyeHeight());
 
         Renderer::UpdateFrame(player, renderOrder, MapEditor::sectors);
     }
