@@ -22,12 +22,7 @@ std::unique_ptr<BSPNode> BSPNode::BuildTree(const std::vector<Wall>& walls) {
     auto node = std::make_unique<BSPNode>();
     node->partition = walls[0];
 
-    if (walls.size() == 1) {
-        node->isLeaf = true;
-        return node;
-    }
-
-    std::vector<Wall> leftWalls, rightWalls;
+    std::vector<Wall> frontWalls, backWalls;
 
     for (size_t i = 1; i < walls.size(); i++) {
         const Wall& current = walls[i];
@@ -35,18 +30,28 @@ std::unique_ptr<BSPNode> BSPNode::BuildTree(const std::vector<Wall>& walls) {
         float endSide = PointSide(node->partition, current.end);
 
         if (startSide >= 0 && endSide >= 0) {
-            leftWalls.push_back(current);
+            frontWalls.push_back(current);
         }
         else if (startSide <= 0 && endSide <= 0) {
-            rightWalls.push_back(current);
+            backWalls.push_back(current);
         }
         else {
-            leftWalls.push_back(current);
+            frontWalls.push_back(current);
         }
     }
 
-    node->left = BuildTree(leftWalls);
-    node->right = BuildTree(rightWalls);
+    if (!frontWalls.empty()) node->front = BuildTree(frontWalls);
+    else {
+        node->front = std::make_unique<BSPNode>();
+        node->front->isLeaf = true;
+        node->front->sectorId = node->partition.frontSector;
+    }
+    if (!backWalls.empty()) node->back = BuildTree(backWalls);
+    else {
+        node->back = std::make_unique<BSPNode>();
+        node->back->isLeaf = true;
+        node->back->sectorId = node->partition.backSector;
+    }
 
     return node;
 }
@@ -56,13 +61,23 @@ void TraverseTree(const BSPNode* node, const Vector2& playerPos, std::vector<Wal
 
     float side = PointSide(node->partition, playerPos);
     if (side >= 0) {
-        TraverseTree(node->right.get(), playerPos, outWalls);
+        TraverseTree(node->back.get(), playerPos, outWalls);
         outWalls.push_back(node->partition);
-        TraverseTree(node->left.get(), playerPos, outWalls);
+        TraverseTree(node->front.get(), playerPos, outWalls);
     }
     else {
-        TraverseTree(node->left.get(), playerPos, outWalls);
+        TraverseTree(node->front.get(), playerPos, outWalls);
         outWalls.push_back(node->partition);
-        TraverseTree(node->right.get(), playerPos, outWalls);
+        TraverseTree(node->back.get(), playerPos, outWalls);
     }
+}
+
+int FindPlayerSector(const BSPNode* node, const Vector2& playerPos) {
+    if (!node) return -1;
+    if (node->isLeaf) return node->sectorId;
+
+    float side = PointSide(node->partition, playerPos);
+
+    if (side >= 0) return FindPlayerSector(node->front.get(), playerPos);
+    return FindPlayerSector(node->back.get(), playerPos);
 }

@@ -10,6 +10,10 @@
 #include <SDL3/SDL_render.h>
 
 #include "../../Headers/Renderer/Renderer.h"
+
+#include <string>
+
+#include "../../Headers/Engine/GameTime.h"
 #include "../../Headers/Math/Vector.h"
 
 #define SCREEN_WIDTH 960
@@ -195,6 +199,11 @@ namespace Renderer {
     };
 
     DrawLine(screenCentre, facingEnd);
+
+        SDL_SetRenderScale(renderer, 2.5f, 2.5f);
+        SDL_RenderDebugText(renderer, 0, 0, std::to_string(static_cast<int>(GameTime::GetFPS())).c_str());
+        SDL_SetRenderScale(renderer, 1.0f, 1.0f);
+
 
     SDL_RenderPresent(renderer);
 }

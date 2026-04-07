@@ -23,7 +23,7 @@ int main() {
     Player player((Vector2){125, 125});
 
     Sector s1 = {0, 90};
-    Sector s2 = {0, 75};
+    Sector s2 = {20, 75};
 
     MapEditor::CreateSectorDirectly(s1); // sector 0
     MapEditor::CreateSectorDirectly(s2); // sector 1
@@ -64,6 +64,7 @@ int main() {
 
         std::vector<Wall> renderOrder;
         TraverseTree(bspTree.get(), player.GetPosition(), renderOrder);
+        int currentSector = FindPlayerSector(bspTree.get(), player.GetPosition());
 
         Renderer::UpdateFrame(player, renderOrder, MapEditor::sectors);
     }

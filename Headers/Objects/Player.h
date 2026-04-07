@@ -18,7 +18,7 @@ private:
 
 public:
     explicit Player(const Vector2 pos = {0, 0}, const float speed = 50.0f, const float size = 10.0f)
-    : velocity(0.0f, 0.0f), position(pos), speed(speed), size(size) {}
+    : velocity(0.0f, 0.0f), position(pos), speed(speed), size(size), angle(0.0f) {}
     void Update();
 
     void SetVelocity(const Vector2 vel) { velocity = vel; }

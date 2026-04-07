@@ -13,13 +13,16 @@
 
 struct BSPNode {
     Wall partition;
-    std::unique_ptr<BSPNode> left, right;
-    bool isLeaf = false;
+    std::unique_ptr<BSPNode> front, back;
 
     static std::unique_ptr<BSPNode> BuildTree(const std::vector<Wall>& walls);
+
+    bool isLeaf = false;
+    int sectorId = -1;
 };
 
 void TraverseTree(const BSPNode* node, const Vector2& playerPos, std::vector<Wall>& outWalls);
+int FindPlayerSector(const BSPNode* node, const Vector2& playerPos);
 
 
 #endif //TILKYENGINE_BSP_H
