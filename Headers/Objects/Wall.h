@@ -9,8 +9,6 @@
 
 struct Wall {
     Vector2 start, end;
-    Vector3 color;
-    int frontSector = -1, backSector = -1;
 };
 
 #endif //TILKYENGINE_WALL_H

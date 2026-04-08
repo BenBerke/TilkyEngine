@@ -14,11 +14,8 @@
 #define FRICTION .8f
 #define TURN_SPEED 2.0f
 
-void Player::Update() {
-    if (GetCurrentEyeHeight() < MapEditor::sectors[GetCurrentSector()].floorHeight + GetEyeHeight())
-        SetCurrentEyeHeight(GetCurrentEyeHeight() + GetStepSpeed() * GameTime::deltaTime);
-    else SetCurrentEyeHeight(GetCurrentEyeHeight() - GetStepSpeed() * GameTime::deltaTime);
 
+void Player::Update() {
     Vector2 input = {0.0f, 0.0f};
 
     if (InputManager::GetKey(SDL_SCANCODE_W)) input.y += 1.0f;
@@ -29,14 +26,15 @@ void Player::Update() {
     if (InputManager::GetKey(SDL_SCANCODE_Q)) angle += TURN_SPEED * GameTime::deltaTime;
     if (InputManager::GetKey(SDL_SCANCODE_E)) angle -= TURN_SPEED * GameTime::deltaTime;
 
-    Vector2 forward = { std::sin(angle), std::cos(angle) };
-    Vector2 right   = { std::cos(angle), -std::sin(angle) };
+    angle += TURN_SPEED * GameTime::deltaTime * InputManager::GetMouseDelta().x;
+
+    const Vector2 forward = {std::sin(angle), std::cos(angle)};
+    const Vector2 right = {std::cos(angle), -std::sin(angle)};
 
     if (input.x != 0.0f || input.y != 0.0f) {
-        Vector2 moveDir = right * input.x + forward * input.y;
+        const Vector2 moveDir = right * input.x + forward * input.y;
         velocity = moveDir.Normalized() * speed;
-    }
-    else {
+    } else {
         velocity *= FRICTION;
     }
 

@@ -16,15 +16,12 @@ add_executable(TilkyEngine
         src/Objects/Player.cpp
         Headers/Objects/Player.h
         Headers/Engine/GameTime.h
-        src/Renderer/BSP.cpp
-        Headers/Renderer/BSP.h
         src/Renderer/MapEditor.cpp
         Headers/Renderer/MapEditor.h
         Headers/Objects/Wall.h
+        src/Engine/GameTime.cpp
         Headers/Renderer/Renderer.h
         src/Renderer/Renderer.cpp
-        src/Engine/GameTime.cpp
-        Headers/Objects/Sector.h
 )
 
 target_link_libraries(TilkyEngine PRIVATE

@@ -6,7 +6,6 @@
 
 namespace {
     inline std::vector<Wall> walls;
-    inline std::vector<Sector> sectors;
 }
 
 namespace MapEditor {
@@ -14,9 +13,6 @@ namespace MapEditor {
         walls.push_back({start, end});
     }
 
-    void CreateSectorDirectly(const Sector s) {
-        sectors.push_back(s);
-    }
     void CreateWallDirectly(const Wall w) {
         walls.push_back(w);
     }

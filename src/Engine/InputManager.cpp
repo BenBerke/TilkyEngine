@@ -9,7 +9,7 @@ namespace {
     SDL_MouseButtonFlags prevMouseState = 0;
 
     Vector2 mousePosition{};
-    Vector2 prevMousePosition{};
+    Vector2 mouseDelta{};
 }
 
 namespace InputManager {
@@ -22,13 +22,11 @@ namespace InputManager {
 
         std::copy_n(keyboardState, SDL_SCANCODE_COUNT, prevKeyboardState);
 
-        prevMouseState = mouseState;
-        prevMousePosition = mousePosition;
-
         SDL_PumpEvents();
 
         keyboardState = SDL_GetKeyboardState(nullptr);
         mouseState = SDL_GetMouseState(&mousePosition.x, &mousePosition.y);
+        SDL_GetRelativeMouseState(&mouseDelta.x, &mouseDelta.y);
     }
 
     bool GetKeyDown(SDL_Scancode key) {
@@ -62,6 +60,6 @@ namespace InputManager {
     }
 
     Vector2 GetMouseDelta() {
-        return mousePosition - prevMousePosition;
+        return mouseDelta;
     }
 }

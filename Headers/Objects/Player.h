@@ -42,5 +42,4 @@ public:
     [[nodiscard]] float GetCurrentEyeHeight() const { return currentEyeHeight; }
 };
 
-
 #endif //TILKYENGINE_PLAYER_H
