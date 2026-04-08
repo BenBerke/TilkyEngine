@@ -20,14 +20,20 @@
 
 void Player::Update() {
     Vector2 input = {0.0f, 0.0f};
+    Vector2 tankInput = {0.0f, 0.0f};
 
     if (InputManager::GetKey(SDL_SCANCODE_W)) input.y += 1.0f;
     if (InputManager::GetKey(SDL_SCANCODE_A)) input.x -= 1.0f;
     if (InputManager::GetKey(SDL_SCANCODE_S)) input.y -= 1.0f;
     if (InputManager::GetKey(SDL_SCANCODE_D)) input.x += 1.0f;
 
-    if (InputManager::GetKey(SDL_SCANCODE_Q)) angle += TURN_SPEED * GameTime::deltaTime;
-    if (InputManager::GetKey(SDL_SCANCODE_E)) angle -= TURN_SPEED * GameTime::deltaTime;
+    if (InputManager::GetKey(SDL_SCANCODE_UP)) tankInput.y += 1.0f;
+    if (InputManager::GetKey(SDL_SCANCODE_LEFT)) tankInput.x -= 1.0f;
+    if (InputManager::GetKey(SDL_SCANCODE_DOWN)) tankInput.y -= 1.0f;
+    if (InputManager::GetKey(SDL_SCANCODE_RIGHT)) tankInput.x += 1.0f;
+
+    if (InputManager::GetKey(SDL_SCANCODE_Q)) angle -= TURN_SPEED * GameTime::deltaTime;
+    if (InputManager::GetKey(SDL_SCANCODE_E)) angle += TURN_SPEED * GameTime::deltaTime;
 
     angle += InputManager::GetMouseDelta().x * SENSITIVITY;
 
@@ -36,7 +42,7 @@ void Player::Update() {
     const float sin = std::sin(angleInRad);
     const float cos = std::cos(angleInRad);
 
-    const Vector2 forward = {sin, -cos};
+    const Vector2 forward = {sin, cos};
     const Vector2 right = {cos, -sin};
 
     if (input.x != 0.0f || input.y != 0.0f) {
@@ -44,6 +50,6 @@ void Player::Update() {
         velocity = moveDir.Normalized() * speed;
     } else velocity *= FRICTION;
 
-
     position += velocity * GameTime::deltaTime;
+    position += tankInput * speed * GameTime::deltaTime;
 }

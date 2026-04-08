@@ -22,7 +22,7 @@
 
 #define FPS_COOLDOWN_SECONDS 1.0f
 
-#define DEBUG true
+#define DEBUG 1
 
 namespace {
     SDL_Window *window = nullptr;
@@ -84,12 +84,11 @@ namespace Renderer {
         const float sin = std::sin(angleInRadians);
         const float cos = std::cos(angleInRadians);
 
-        const Vector2 forward = {sin, -cos};
-        const Vector2 right = {cos, sin};
+        const Vector2 forward = {sin, cos};
+        const Vector2 right = {cos, -sin};
 
-        auto Lerp = [](float a, float b, float t)->float { return a + (b - a) * t; };
+        auto Lerp = [](const float a, const float b, const float t)->float { return a + (b - a) * t; };
 
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         for (const Wall& wall : walls) {
             const Vector2 wallVector = wall.start - wall.end;
             const Vector2 relStart = wall.start - player.GetPosition();
@@ -99,21 +98,6 @@ namespace Renderer {
             float startCamZ = relStart.Dot(forward);
             float endCamX = relEnd.Dot(right);
             float endCamZ = relEnd.Dot(forward);
-
-            if (DEBUG) {
-                SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-                const Vector2 screenStart = {
-                    screenCentre.x + relStart.x,
-                    screenCentre.y - relStart.y
-                };
-
-                const Vector2 screenEnd = {
-                    screenCentre.x + relEnd.x,
-                    screenCentre.y - relEnd.y
-                };
-
-                DrawLine(screenStart, screenEnd);
-            }
 
             if (startCamZ <= nearPlane && endCamZ <= nearPlane) continue;
             if (startCamZ <= nearPlane) {
@@ -128,17 +112,55 @@ namespace Renderer {
                 endCamZ = nearPlane;
             }
 
-            const double startScreenX = screenCentre.x + (startCamX / startCamZ) * projectionScale;
-            const double endScreenX = screenCentre.x + (endCamX / endCamZ) * projectionScale;
+            double startScreenX = screenCentre.x + (startCamX / startCamZ) * projectionScale;
+            double endScreenX = screenCentre.x + (endCamX / endCamZ) * projectionScale;
 
-            if ((startScreenX < 0.0f && endScreenX < 0.0f) || (startScreenX > SCREEN_WIDTH && endScreenX > SCREEN_WIDTH)) continue;
+            if ((startScreenX < 0.0f && endScreenX < 0.0f) || (startScreenX >= SCREEN_WIDTH && endScreenX >= SCREEN_WIDTH)) continue;
 
-            DrawLine(Vector2{static_cast<float>(startScreenX), 100.0f}, {static_cast<float>(endScreenX), 100.0f});
+            float startYTop = screenCentre.y - ((wallTop - eyeHeight) / startCamZ) * projectionScale;
+            float startYBot = screenCentre.y - ((wallBottom - eyeHeight) / startCamZ) * projectionScale;
+            float endYTop = screenCentre.y - ((wallTop - eyeHeight) / endCamZ) * projectionScale;
+            float endYBot = screenCentre.y - ((wallBottom - eyeHeight) / endCamZ) * projectionScale;
+
+            if (startScreenX > endScreenX) {
+                std::swap(startScreenX, endScreenX);
+                std::swap(startYTop, endYTop);
+                std::swap(startYBot, endYBot);
+            }
+
+            int xStart = std::max(0, static_cast<int>(std::ceil(startScreenX)));
+            int xEnd = std::min(SCREEN_WIDTH - 1, static_cast<int>(std::floor(endScreenX)));
+
+            if (xStart > xEnd) continue;
+
+            SDL_SetRenderDrawColor(renderer, 100, 80, 90, 255);
+            for (int x = xStart; x <= xEnd; x++) {
+                float t = endScreenX == startScreenX ? 0.0f : (x - startScreenX) / (endScreenX - startScreenX);
+                float yTop = startYTop + (endYTop - startYTop) * t;
+                float yBot = startYBot + (endYBot - startYBot) * t;
+                DrawLine({static_cast<float>(x), yTop}, {static_cast<float>(x), yBot});
+            }
         }
 
         // ---------- PLAYER DEBUG PASS ----------
         if (DEBUG) {
-            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+            for (const auto&[start, end] : walls) {
+                const Vector2 relStart = start - player.GetPosition();
+                const Vector2 relEnd = end - player.GetPosition();
+                SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+                const Vector2 screenStart = {
+                    screenCentre.x + relStart.x,
+                    screenCentre.y - relStart.y
+                };
+
+                const Vector2 screenEnd = {
+                    screenCentre.x + relEnd.x,
+                    screenCentre.y - relEnd.y
+                };
+
+                DrawLine(screenStart, screenEnd);
+            }
+            SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
             const SDL_FRect pRect = {
                 screenCentre.x - player.GetSize() * 0.5f,
                 screenCentre.y - player.GetSize() * 0.5f,
@@ -149,12 +171,12 @@ namespace Renderer {
 
             const Vector2 leftDir = {
                 std::sin(leftAngleInRadians),
-                -std::cos(leftAngleInRadians)
+                std::cos(leftAngleInRadians)
             };
 
             const Vector2 rightDir = {
                 std::sin(rightAngleInRadians),
-                -std::cos(rightAngleInRadians)
+                std::cos(rightAngleInRadians)
             };
             const Vector2 leftEnd = {
                 screenCentre.x + leftDir.x * debugLength,
