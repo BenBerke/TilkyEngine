@@ -40,7 +40,7 @@ struct Vector2{
     [[nodiscard]] float Length() const{ return std::sqrt(x*x + y*y); }
     [[nodiscard]] Vector2 Normalized() const {
         float len = Length();
-        return len == 0 ? Vector2() : Vector2(x / len, y / len); 
+        return len == 0 ? Vector2() : Vector2(x / len, y / len);
     }
     void Normalize(){
         float len = Length();
@@ -94,7 +94,7 @@ struct Vector3{
     [[nodiscard]] float Length() const{ return std::sqrt(x*x + y*y + z*z); }
     [[nodiscard]] Vector3 Normalized() const {
         float len = Length();
-        return len == 0 ? Vector3() : Vector3(x / len, y / len, z / len); 
+        return len == 0 ? Vector3() : Vector3(x / len, y / len, z / len);
     }
     void Normalize(){
         float len = Length();

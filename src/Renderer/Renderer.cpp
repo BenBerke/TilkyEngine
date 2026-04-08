@@ -15,10 +15,14 @@
 
 #include "../../Headers/Engine/GameTime.h"
 
+#define USE_MATH_DEFINES
+
 #define SCREEN_WIDTH 960
 #define SCREEN_HEIGHT 600
 
 #define FPS_COOLDOWN_SECONDS 1.0f
+
+#define DEBUG true
 
 namespace {
     SDL_Window *window = nullptr;
@@ -44,7 +48,6 @@ namespace Renderer {
         SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255);
         SDL_RenderClear(renderer);
     }
-
     void DrawLine(const Vector2 start, const Vector2 end) {
         SDL_RenderLine(renderer, start.x, start.y, end.x, end.y);
     }
@@ -53,51 +56,120 @@ namespace Renderer {
     static float timerHelper = 0;
     static int fps = 0;
 
-    static Vector2 screenCentre = {SCREEN_WIDTH/2, SCREEN_HEIGHT/2};
+    constexpr static float FOV = 90;
+    constexpr static float halfFov = FOV * 0.5f;
+    constexpr static double fovInRadians = FOV * M_PI / 180.0f;
+
+    static Vector2 screenCentre = {SCREEN_WIDTH * .5f, SCREEN_HEIGHT * .5f};
+
+    constexpr float nearPlane = 0.01f;
+    constexpr float wallBottom = 0.0f;
+    constexpr float wallTop = 64.0f;
+    constexpr float eyeHeight = 32.0f;
+    static double projectionScale = SCREEN_WIDTH * .5f / std::tan(fovInRadians * .5f);
 
     void UpdateFrame(const Player &player, const std::vector<Wall> &walls) {
         timer = GameTime::time;
 
+        const Vector2 pos = player.GetPosition();
         const float angle = player.GetAngle();
-        Vector2 forward = {std::sin(angle), std::cos(angle)};
-        Vector2 right = {std::cos(angle), -std::sin(angle)};
+        const float angleInRadians = angle * M_PI / 180.0f;
 
-        // ---------- TOP-DOWN DEBUG PASS ----------
-        SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
-        for (const Wall &wall: walls) {
-            Vector2 relativeStart = wall.start - player.GetPosition();
-            Vector2 relativeEnd = wall.end - player.GetPosition();
+        const float leftAngle = angle + halfFov;
+        const float rightAngle = angle - halfFov;
 
-            Vector2 screenStart = {
-                screenCentre.x + relativeStart.x,
-                screenCentre.y - relativeStart.y
-            };
+        const float leftAngleInRadians = leftAngle * M_PI / 180.0f;
+        const float rightAngleInRadians = rightAngle * M_PI / 180.0f;
 
-            Vector2 screenEnd = {
-                screenCentre.x + relativeEnd.x,
-                screenCentre.y - relativeEnd.y
-            };
+        const float sin = std::sin(angleInRadians);
+        const float cos = std::cos(angleInRadians);
 
-            DrawLine(screenStart, screenEnd);
+        const Vector2 forward = {sin, -cos};
+        const Vector2 right = {cos, sin};
+
+        auto Lerp = [](float a, float b, float t)->float { return a + (b - a) * t; };
+
+        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
+        for (const Wall& wall : walls) {
+            const Vector2 wallVector = wall.start - wall.end;
+            const Vector2 relStart = wall.start - player.GetPosition();
+            const Vector2 relEnd = wall.end - player.GetPosition();
+
+            float startCamX = relStart.Dot(right);
+            float startCamZ = relStart.Dot(forward);
+            float endCamX = relEnd.Dot(right);
+            float endCamZ = relEnd.Dot(forward);
+
+            if (DEBUG) {
+                SDL_SetRenderDrawColor(renderer, 0, 0, 255, 255);
+                const Vector2 screenStart = {
+                    screenCentre.x + relStart.x,
+                    screenCentre.y - relStart.y
+                };
+
+                const Vector2 screenEnd = {
+                    screenCentre.x + relEnd.x,
+                    screenCentre.y - relEnd.y
+                };
+
+                DrawLine(screenStart, screenEnd);
+            }
+
+            if (startCamZ <= nearPlane && endCamZ <= nearPlane) continue;
+            if (startCamZ <= nearPlane) {
+                const float t = (nearPlane - startCamZ) / (endCamZ - startCamZ);
+                startCamX = Lerp(startCamX, endCamX, t);
+                startCamZ = nearPlane;
+            }
+
+            if (endCamZ <= nearPlane) {
+                const float t = (nearPlane - endCamZ) / (startCamZ - endCamZ);
+                endCamX = Lerp(endCamX, startCamX, t);
+                endCamZ = nearPlane;
+            }
+
+            const double startScreenX = screenCentre.x + (startCamX / startCamZ) * projectionScale;
+            const double endScreenX = screenCentre.x + (endCamX / endCamZ) * projectionScale;
+
+            if ((startScreenX < 0.0f && endScreenX < 0.0f) || (startScreenX > SCREEN_WIDTH && endScreenX > SCREEN_WIDTH)) continue;
+
+            DrawLine(Vector2{static_cast<float>(startScreenX), 100.0f}, {static_cast<float>(endScreenX), 100.0f});
         }
 
-
-
         // ---------- PLAYER DEBUG PASS ----------
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-        const SDL_FRect pRect = {
-            screenCentre.x - player.GetSize() * 0.5f,
-            screenCentre.y - player.GetSize() * 0.5f,
-            player.GetSize(),
-            player.GetSize()
-        };
-        SDL_RenderFillRect(renderer, &pRect);
-        SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
-        Vector2 facingEnd = {
-            screenCentre.x + forward.x * 30.0f,
-            screenCentre.y - forward.y * 30.0f
-        };
-        DrawLine(screenCentre, facingEnd);
+        if (DEBUG) {
+            SDL_SetRenderDrawColor(renderer, 255, 0, 0, 255);
+            const SDL_FRect pRect = {
+                screenCentre.x - player.GetSize() * 0.5f,
+                screenCentre.y - player.GetSize() * 0.5f,
+                player.GetSize(),
+                player.GetSize()
+            };
+            constexpr float debugLength = 1000.0f;
+
+            const Vector2 leftDir = {
+                std::sin(leftAngleInRadians),
+                -std::cos(leftAngleInRadians)
+            };
+
+            const Vector2 rightDir = {
+                std::sin(rightAngleInRadians),
+                -std::cos(rightAngleInRadians)
+            };
+            const Vector2 leftEnd = {
+                screenCentre.x + leftDir.x * debugLength,
+                screenCentre.y - leftDir.y * debugLength
+            };
+
+            const Vector2 rightEnd = {
+                screenCentre.x + rightDir.x * debugLength,
+                screenCentre.y - rightDir.y * debugLength
+            };
+            DrawLine(screenCentre, leftEnd);
+            DrawLine(screenCentre, rightEnd);
+
+            SDL_RenderFillRect(renderer, &pRect);
+        }
 
         if (timer > timerHelper + FPS_COOLDOWN_SECONDS) {
             fps = static_cast<int>(GameTime::GetFPS());

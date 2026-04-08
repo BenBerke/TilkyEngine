@@ -11,8 +11,11 @@
 #include "../../Headers/Engine/GameTime.h"
 #include "../../Headers/Renderer/MapEditor.h"
 
+#define USE_MATH_DEFINES
+
 #define FRICTION .8f
-#define TURN_SPEED 2.0f
+#define TURN_SPEED 90.0f
+#define SENSITIVITY .5f
 
 
 void Player::Update() {
@@ -26,17 +29,21 @@ void Player::Update() {
     if (InputManager::GetKey(SDL_SCANCODE_Q)) angle += TURN_SPEED * GameTime::deltaTime;
     if (InputManager::GetKey(SDL_SCANCODE_E)) angle -= TURN_SPEED * GameTime::deltaTime;
 
-    angle += TURN_SPEED * GameTime::deltaTime * InputManager::GetMouseDelta().x;
+    angle += InputManager::GetMouseDelta().x * SENSITIVITY;
 
-    const Vector2 forward = {std::sin(angle), std::cos(angle)};
-    const Vector2 right = {std::cos(angle), -std::sin(angle)};
+    float angleInRad = angle * M_PI / 180.0f;
+
+    const float sin = std::sin(angleInRad);
+    const float cos = std::cos(angleInRad);
+
+    const Vector2 forward = {sin, -cos};
+    const Vector2 right = {cos, -sin};
 
     if (input.x != 0.0f || input.y != 0.0f) {
         const Vector2 moveDir = right * input.x + forward * input.y;
         velocity = moveDir.Normalized() * speed;
-    } else {
-        velocity *= FRICTION;
-    }
+    } else velocity *= FRICTION;
+
 
     position += velocity * GameTime::deltaTime;
 }
