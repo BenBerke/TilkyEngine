@@ -22,6 +22,8 @@ add_executable(TilkyEngine
         src/Engine/GameTime.cpp
         Headers/Renderer/Renderer.h
         src/Renderer/Renderer.cpp
+        Headers/Renderer/BSP.h
+        src/Renderer/BSP.cpp
 )
 
 target_link_libraries(TilkyEngine PRIVATE

@@ -9,6 +9,7 @@
 
 struct Wall {
     Vector2 start, end;
+    Vector3 color;
 };
 
 #endif //TILKYENGINE_WALL_H

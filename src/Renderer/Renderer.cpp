@@ -11,7 +11,6 @@
 #include "../../Headers/Renderer/Renderer.h"
 
 #include <iostream>
-#include <ostream>
 
 #include "../../Headers/Engine/GameTime.h"
 
@@ -90,7 +89,6 @@ namespace Renderer {
         auto Lerp = [](const float a, const float b, const float t)->float { return a + (b - a) * t; };
 
         for (const Wall& wall : walls) {
-            const Vector2 wallVector = wall.start - wall.end;
             const Vector2 relStart = wall.start - player.GetPosition();
             const Vector2 relEnd = wall.end - player.GetPosition();
 
@@ -133,20 +131,20 @@ namespace Renderer {
 
             if (xStart > xEnd) continue;
 
-            SDL_SetRenderDrawColor(renderer, 100, 80, 90, 255);
             for (int x = xStart; x <= xEnd; x++) {
                 float t = endScreenX == startScreenX ? 0.0f : (x - startScreenX) / (endScreenX - startScreenX);
                 float yTop = startYTop + (endYTop - startYTop) * t;
                 float yBot = startYBot + (endYBot - startYBot) * t;
+                SDL_SetRenderDrawColor(renderer, wall.color.x, wall.color.y, wall.color.z, 255);
                 DrawLine({static_cast<float>(x), yTop}, {static_cast<float>(x), yBot});
             }
         }
 
         // ---------- PLAYER DEBUG PASS ----------
         if (DEBUG) {
-            for (const auto&[start, end] : walls) {
-                const Vector2 relStart = start - player.GetPosition();
-                const Vector2 relEnd = end - player.GetPosition();
+            for (const Wall& wall : walls) {
+                const Vector2 relStart = wall.start - player.GetPosition();
+                const Vector2 relEnd = wall.end - player.GetPosition();
                 SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
                 const Vector2 screenStart = {
                     screenCentre.x + relStart.x,
