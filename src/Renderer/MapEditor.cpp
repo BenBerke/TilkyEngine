@@ -9,10 +9,6 @@ namespace {
 }
 
 namespace MapEditor {
-    void CreateWall(const Vector2 start, const Vector2 end) {
-        walls.push_back({start, end});
-    }
-
     void CreateWallDirectly(const Wall w) {
         walls.push_back(w);
     }

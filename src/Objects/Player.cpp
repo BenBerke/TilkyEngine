@@ -5,6 +5,7 @@
 #include "../../Headers/Objects/Player.h"
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 
 #include "../../Headers/Engine/InputManager.h"
@@ -18,16 +19,17 @@
 #define SENSITIVITY .5f
 
 constexpr int COLLISION_ITERATIONS = 4;
+constexpr float crouchSpeed = 10.0f;
 
-Vector2 ClosestPointOnSegmet(const Vector2& a, const Vector2& b, const Vector2& p) {
-    Vector2 ab = b - a;
-    const float abLenSq = ab.Dot(ab);
-    if (abLenSq <= 0.00001f) return a;
+static Vector2 ClosestPointOnSegment(const Wall& wall, const Vector2& p) {
+    if (wall.lengthSq <= 0.00001f) {
+        return wall.start;
+    }
 
-    float t = (p - a).Dot(ab) / abLenSq;
+    float t = (p - wall.start).Dot(wall.dir) / wall.lengthSq;
     t = std::clamp(t, 0.0f, 1.0f);
 
-    return a + ab * t;
+    return wall.start + wall.dir * t;
 }
 
 void Player::Update(std::vector<Wall>& walls) {
@@ -49,45 +51,66 @@ void Player::Update(std::vector<Wall>& walls) {
 
     angle += InputManager::GetMouseDelta().x * SENSITIVITY;
 
+    float targetHeight = eyeHeight;
+    if (InputManager::GetKey(SDL_SCANCODE_C)) {
+        targetHeight = eyeHeight * 0.5f;
+    }
+
+    const float newHeight =
+        currentEyeHeight + (targetHeight - currentEyeHeight) * crouchSpeed * GameTime::deltaTime;
+
+    SetCurrentEyeHeight(newHeight);
+
     float angleInRad = angle * M_PI / 180.0f;
 
-    const float sin = std::sin(angleInRad);
-    const float cos = std::cos(angleInRad);
+    const float s = std::sin(angleInRad);
+    const float c = std::cos(angleInRad);
 
-    const Vector2 forward = {sin, cos};
-    const Vector2 right = {cos, -sin};
+    const Vector2 forward = {s, c};
+    const Vector2 right = {c, -s};
 
     if (input.x != 0.0f || input.y != 0.0f) {
         const Vector2 moveDir = right * input.x + forward * input.y;
         velocity = moveDir.Normalized() * speed;
-    } else velocity *= FRICTION;
+    } else {
+        velocity *= FRICTION;
+    }
 
     position += velocity * GameTime::deltaTime;
     position += tankInput * speed * GameTime::deltaTime;
 
     for (int iter = 0; iter < COLLISION_ITERATIONS; ++iter) {
-        bool collider = false;
+        bool collided = false;
+
         for (const Wall& wall : walls) {
-            const Vector2 closest = ClosestPointOnSegmet(wall.start, wall.end, position);
+            const Vector2 closest = ClosestPointOnSegment(wall, position);
             const Vector2 delta = position - closest;
 
             const float distSq = delta.Dot(delta);
             const float radiusSq = size * size;
-            if (distSq > radiusSq) continue;
+
+            if (distSq >= radiusSq) continue;
 
             float dist = std::sqrt(distSq);
 
             Vector2 normal;
-            if (dist > 0.00001f) normal = delta * (1.0/dist);
-            else {
-                Vector2 wallDir = wall.end - wall.start;
-                normal = {-wallDir.y, wallDir.x};
-                normal.Normalize();
+            if (dist > 0.00001f) {
+                normal = delta * (1.0f / dist);
+            } else {
+                normal = wall.normal;
             }
 
-            float penetration = size - dist;
+            const float penetration = size - dist;
             position += normal * penetration;
+
+            const float intoWall = velocity.Dot(normal);
+            if (intoWall < 0.0f) {
+                velocity -= normal * intoWall;
+            }
+
+            collided = true;
         }
+
+        if (!collided) break;
     }
 }
-

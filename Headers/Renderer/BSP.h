@@ -21,6 +21,8 @@ struct BSPNode {
     std::unique_ptr<BSPNode> front;
     std::unique_ptr<BSPNode> back;
 
+    explicit BSPNode(const Wall& splitter) : splitter(splitter) {}
+
     int frontCount = 0, backCount = 0, spanningCount = 0;
 
 };
