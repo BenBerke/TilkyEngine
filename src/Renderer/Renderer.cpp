@@ -10,8 +10,6 @@
 
 #include "../../Headers/Renderer/Renderer.h"
 
-#include <iostream>
-
 #include "../../Headers/Engine/GameTime.h"
 
 #define USE_MATH_DEFINES
