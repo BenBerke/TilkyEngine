@@ -1,4 +1,6 @@
+#include <iostream>
 #include <iterator>
+#include <vector>
 
 #include "Headers/Engine/InputManager.h"
 #include "Headers/Engine/GameTime.h"
@@ -10,95 +12,116 @@
 #include "Headers/Renderer/Renderer.h"
 #include "Headers/Renderer/BSP.h"
 
-
 #define SCREEN_WIDTH 960
 #define SCREEN_HEIGHT 600
 
 int main() {
     Renderer::Initialize();
 
-auto MakeWall = [](Vector2 a, Vector2 b, Vector3 c, int front, int back = -1) {
-    Wall w(a, b, c);
-    w.frontSector = front;
-    w.backSector = back;
-    return w;
-};
-    Sector sectors[] = {
-        {  0.0f,  48.0f }, // 0 Main Floor (Baseline)
-        {  8.0f,  56.0f }, // 1 Low Tier (Step up)
-        { 16.0f,  64.0f }, // 2 Mid Tier (Step up again)
-        { 24.0f,  72.0f }, // 3 High Tier (Waist high to a size 12 player)
-        { -8.0f,  40.0f }, // 4 Shallow Sunken Pool (Step down)
-        { 12.0f,  48.0f }, // 5 The Dais (Small platform)
+    auto MakeWall = [](Vector2 a, Vector2 b, Vector3 c, int front, int back = -1) {
+        Wall w(a, b, c);
+        w.frontSector = front;
+        w.backSector = back;
+        return w;
     };
 
+    Sector sectors[] = {
+        {  0.0f, 48.0f }, // 0 top-left : normal
+        {  8.0f, 48.0f }, // 1 top-right : raised floor, same ceiling
+        {  0.0f, 32.0f }, // 2 bottom-left : same floor, lower ceiling
+        { -8.0f, 40.0f }, // 3 bottom-right : sunken pool
+    };
 
-    const std::vector walls = {
-    // ---------- OUTER BOUNDARY (Sector 0) ----------
-    MakeWall({-200, -200}, { 200, -200}, {100, 100, 105}, 0),
-    MakeWall({ 200, -200}, { 200,  200}, {110, 110, 115}, 0),
-    MakeWall({ 200,  200}, {-200,  200}, {120, 120, 125}, 0),
-    MakeWall({-200,  200}, {-200, -200}, {110, 110, 115}, 0),
+    const std::vector<Wall> walls = {
+        // ---------- OUTER BOUNDARY ----------
+        MakeWall({-220,  160}, {   0,  160}, {110, 110, 115}, 0),
+        MakeWall({   0,  160}, { 220,  160}, {120, 120, 125}, 1),
 
-    // ---------- SHALLOW POOL (Sector 4: Step Down -8) ----------
-    MakeWall({-180, -180}, { -80, -180}, { 50,  80, 200}, 0, 4),
-    MakeWall({ -80, -180}, { -80,  -80}, { 50,  80, 200}, 0, 4),
-    MakeWall({ -80,  -80}, {-180,  -80}, { 50,  80, 200}, 0, 4),
-    MakeWall({-180,  -80}, {-180, -180}, { 50,  80, 200}, 0, 4),
+        MakeWall({ 220,  160}, { 220,    0}, {130, 130, 135}, 1),
+        MakeWall({ 220,    0}, { 220, -160}, {140, 140, 145}, 3),
 
-    // ---------- LOW TIER (Sector 1: Step Up +8) ----------
-    MakeWall({  50, -150}, { 150, -150}, {150, 150, 150}, 0, 1),
-    MakeWall({ 150, -150}, { 150,  -50}, {150, 150, 150}, 0, 1),
-    MakeWall({ 150,  -50}, {  50,  -50}, {150, 150, 150}, 0, 1),
-    MakeWall({  50,  -50}, {  50, -150}, {150, 150, 150}, 0, 1),
+        MakeWall({ 220, -160}, {   0, -160}, {135, 135, 140}, 3),
+        MakeWall({   0, -160}, {-220, -160}, {125, 125, 130}, 2),
 
-    // ---------- MID TIER (Sector 2: Step Up +16) ----------
-    // Attached to the Low Tier
-    MakeWall({ 150,  -50}, { 150,   50}, {180, 180, 180}, 0, 2),
-    MakeWall({ 150,   50}, {  50,   50}, {180, 180, 180}, 0, 2),
-    MakeWall({  50,   50}, {  50,  -50}, {180, 180, 180}, 0, 2),
-    // (Shared portal edge with Sector 1 would go here if your engine supports sector-to-sector portals)
+        MakeWall({-220, -160}, {-220,    0}, {120, 120, 125}, 2),
+        MakeWall({-220,    0}, {-220,  160}, {110, 110, 115}, 0),
 
-    // ---------- HIGH TIER (Sector 3: Step Up +24) ----------
-    MakeWall({ -50,   80}, {  50,   80}, {210, 210, 210}, 0, 3),
-    MakeWall({  50,   80}, {  50,  150}, {210, 210, 210}, 0, 3),
-    MakeWall({  50,  150}, { -50,  150}, {210, 210, 210}, 0, 3),
-    MakeWall({ -50,  150}, { -50,   80}, {210, 210, 210}, 0, 3),
+        // ---------- INTERNAL PORTAL WALLS ----------
+        // vertical top divider: sector 1 on the right, sector 0 on the left
+        MakeWall({   0,  160}, {   0,    0}, {255, 120, 120}, 1, 0),
 
-    // ---------- THE DAIS (Sector 5: Small +12 rise) ----------
-    // Right in the center, just high enough for a size 12 player to jump on
-    MakeWall({ -20,  -20}, {  20,  -20}, {255, 255, 255}, 0, 5),
-    MakeWall({  20,  -20}, {  20,   20}, {255, 255, 255}, 0, 5),
-    MakeWall({  20,   20}, { -20,   20}, {255, 255, 255}, 0, 5),
-    MakeWall({ -20,   20}, { -20,  -20}, {255, 255, 255}, 0, 5),
+        // vertical bottom divider: sector 3 on the right, sector 2 on the left
+        MakeWall({   0,    0}, {   0, -160}, {120, 255, 120}, 3, 2),
 
-    // ---------- SOLID DECORATIVE COLUMN (Solid in Sector 0) ----------
-    MakeWall({-150,   50}, {-130,   50}, { 60,  60,  60}, 0),
-    MakeWall({-130,   50}, {-130,   70}, { 60,  60,  60}, 0),
-    MakeWall({-130,   70}, {-150,   70}, { 60,  60,  60}, 0),
-    MakeWall({-150,   70}, {-150,   50}, { 60,  60,  60}, 0),
-};
+        // horizontal left divider: sector 0 above, sector 2 below
+        MakeWall({-220,    0}, {   0,    0}, {120, 120, 255}, 0, 2),
+
+        // horizontal right divider: sector 1 above, sector 3 below
+        MakeWall({   0,    0}, { 220,    0}, {255, 255, 120}, 1, 3),
+    };
+
+    const std::vector<SectorPolygon> sectorPolygons = {
+        {
+            {
+                {-220,    0},
+                {   0,    0},
+                {   0,  160},
+                {-220,  160}
+            },
+            0
+        },
+        {
+            {
+                {   0,    0},
+                { 220,    0},
+                { 220,  160},
+                {   0,  160}
+            },
+            1
+        },
+        {
+            {
+                {-220, -160},
+                {   0, -160},
+                {   0,    0},
+                {-220,    0}
+            },
+            2
+        },
+        {
+            {
+                {   0, -160},
+                { 220, -160},
+                { 220,    0},
+                {   0,    0}
+            },
+            3
+        }
+    };
 
     for (const Wall& w : walls) MapEditor::CreateWallDirectly(w);
     for (const Sector& s : sectors) MapEditor::CreateSectorDirectly(s);
 
-    Player player({0, 50}, 95.0f, 10.0f);
+    Player player({-110, 80}, 95.0f, 10.0f);
 
     const auto tree = BuildBSP(MapEditor::walls);
+    BuildSubSectors(tree.get(), sectorPolygons);
 
     bool running = true;
     while (running) {
         Renderer::BeginFrame();
         InputManager::BeginFrame();
         GameTime::Update();
-        player.Update(MapEditor::walls);
+        player.Update(MapEditor::walls, MapEditor::sectors);
 
         if (InputManager::GetKeyDown(SDL_SCANCODE_ESCAPE)) running = false;
 
-        std::vector<Wall> orderedWalls;
-        CollectBSPWalls(tree.get(), player.GetPosition(), orderedWalls);
+        player.SetCurrentSector(FindSector(tree.get(), player.GetPosition()));
 
-        Renderer::UpdateFrame(player, orderedWalls, MapEditor::sectors);
+       // std::vector<Wall> orderedWalls;
+       // CollectBSPWalls(tree.get(), player.GetPosition(), orderedWalls);
+
+        Renderer::UpdateFrame(player, MapEditor::walls, MapEditor::sectors);
     }
 
     return 0;

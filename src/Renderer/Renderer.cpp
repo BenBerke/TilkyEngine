@@ -11,6 +11,7 @@
 #include "../../Headers/Renderer/Renderer.h"
 
 #include "../../Headers/Engine/GameTime.h"
+#include "../../Headers/Engine/InputManager.h"
 
 #define USE_MATH_DEFINES
 
@@ -18,8 +19,6 @@
 #define SCREEN_HEIGHT 600
 
 #define FPS_COOLDOWN_SECONDS 1.0f
-
-#define DEBUG 1
 
 namespace {
     SDL_Window *window = nullptr;
@@ -151,16 +150,29 @@ namespace Renderer {
                 DrawWallSection(back.ceilHeight, back.floorHeight);
             }
             else if (validFront && validBack) {
-                const Sector& front = sectors[wall.frontSector];
-                const Sector& back = sectors[wall.backSector];
+                int nearSector = -1, farSector = -1;
 
-                if (back.ceilHeight < front.ceilHeight) DrawWallSection(front.ceilHeight, back.ceilHeight);
-                if (back.floorHeight > front.floorHeight) DrawWallSection(back.floorHeight, front.floorHeight);
+                if (player.GetCurrentSector() == wall.frontSector) {
+                    nearSector = wall.frontSector;
+                    farSector = wall.backSector;
+                }
+                else if (player.GetCurrentSector() == wall.backSector) {
+                    nearSector = wall.backSector;
+                    farSector = wall.frontSector;
+                }
+                else continue;
+
+                const Sector& far = sectors[farSector];
+                const Sector& near = sectors[nearSector];
+
+                if (far.ceilHeight < near.ceilHeight) DrawWallSection(near.ceilHeight, far.ceilHeight);
+                if (far.floorHeight != near.floorHeight)
+                    DrawWallSection(std::max(near.floorHeight, far.floorHeight), std::min(near.floorHeight, far.floorHeight));
             }
         }
 
         // ---------- PLAYER DEBUG PASS ----------
-        if (DEBUG) {
+        if (InputManager::GetKey(SDL_SCANCODE_TAB)) {
             for (const Wall& wall : walls) {
                 const Vector2 relStart = wall.start - player.GetPosition();
                 const Vector2 relEnd = wall.end - player.GetPosition();

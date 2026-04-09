@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 
 #include "../../Headers/Engine/InputManager.h"
 #include "../../Headers/Engine/GameTime.h"
@@ -20,6 +19,7 @@
 
 constexpr int COLLISION_ITERATIONS = 4;
 constexpr float crouchSpeed = 10.0f;
+constexpr float stepSize = 10.0f;
 
 static Vector2 ClosestPointOnSegment(const Wall& wall, const Vector2& p) {
     if (wall.lengthSq <= 0.00001f) {
@@ -32,7 +32,8 @@ static Vector2 ClosestPointOnSegment(const Wall& wall, const Vector2& p) {
     return wall.start + wall.dir * t;
 }
 
-void Player::Update(std::vector<Wall>& walls) {
+void Player::Update(const std::vector<Wall>& walls, const std::vector<Sector>& sectors) {
+    float targetHeight = eyeHeight;
     Vector2 input = {0.0f, 0.0f};
     Vector2 tankInput = {0.0f, 0.0f};
 
@@ -41,27 +42,17 @@ void Player::Update(std::vector<Wall>& walls) {
     if (InputManager::GetKey(SDL_SCANCODE_S)) input.y -= 1.0f;
     if (InputManager::GetKey(SDL_SCANCODE_D)) input.x += 1.0f;
 
-    if (InputManager::GetKey(SDL_SCANCODE_UP)) tankInput.y += 1.0f;
-    if (InputManager::GetKey(SDL_SCANCODE_LEFT)) tankInput.x -= 1.0f;
-    if (InputManager::GetKey(SDL_SCANCODE_DOWN)) tankInput.y -= 1.0f;
-    if (InputManager::GetKey(SDL_SCANCODE_RIGHT)) tankInput.x += 1.0f;
-
-    if (InputManager::GetKey(SDL_SCANCODE_Q)) angle -= TURN_SPEED * GameTime::deltaTime;
-    if (InputManager::GetKey(SDL_SCANCODE_E)) angle += TURN_SPEED * GameTime::deltaTime;
+    if (InputManager::GetKey(SDL_SCANCODE_LSHIFT)) SetCurrentSpeed(GetSpeed() * 1.8f);
+    else SetCurrentSpeed(GetSpeed());
+    if (InputManager::GetKey(SDL_SCANCODE_C)) targetHeight *= 0.5f;
 
     angle += InputManager::GetMouseDelta().x * SENSITIVITY;
 
-    float targetHeight = eyeHeight;
-    if (InputManager::GetKey(SDL_SCANCODE_C)) {
-        targetHeight = eyeHeight * 0.5f;
-    }
-
-    const float newHeight =
-        currentEyeHeight + (targetHeight - currentEyeHeight) * crouchSpeed * GameTime::deltaTime;
-
+    targetHeight = sectors[GetCurrentSector()].floorHeight + GetEyeHeight();
+    const float newHeight = currentEyeHeight + (targetHeight - currentEyeHeight) * crouchSpeed * GameTime::deltaTime;
     SetCurrentEyeHeight(newHeight);
 
-    float angleInRad = angle * M_PI / 180.0f;
+    const float angleInRad = angle * M_PI / 180.0f;
 
     const float s = std::sin(angleInRad);
     const float c = std::cos(angleInRad);
@@ -71,13 +62,13 @@ void Player::Update(std::vector<Wall>& walls) {
 
     if (input.x != 0.0f || input.y != 0.0f) {
         const Vector2 moveDir = right * input.x + forward * input.y;
-        velocity = moveDir.Normalized() * speed;
+        velocity = moveDir.Normalized() * GetCurrentSpeed();
     } else {
         velocity *= FRICTION;
     }
 
     position += velocity * GameTime::deltaTime;
-    position += tankInput * speed * GameTime::deltaTime;
+    position += tankInput * GetCurrentSpeed() * GameTime::deltaTime;
 
     for (int iter = 0; iter < COLLISION_ITERATIONS; ++iter) {
         bool collided = false;
@@ -101,11 +92,11 @@ void Player::Update(std::vector<Wall>& walls) {
             }
 
             const float penetration = size - dist;
-            position += normal * penetration;
+            //position += normal * penetration;
 
             const float intoWall = velocity.Dot(normal);
             if (intoWall < 0.0f) {
-                velocity -= normal * intoWall;
+              //  velocity -= normal * intoWall;
             }
 
             collided = true;

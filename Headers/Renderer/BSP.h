@@ -9,9 +9,11 @@
 #include <vector>
 
 #include "../Objects/Wall.h"
+#include "../Objects/Sector.h"
 #include "../Math/Vector.h"
 
 struct BSPNode {
+    bool isLeaf = false;
     std::vector<Wall> walls;
 
     Wall splitter;
@@ -21,6 +23,8 @@ struct BSPNode {
     std::unique_ptr<BSPNode> front;
     std::unique_ptr<BSPNode> back;
 
+    std::unique_ptr<SubSector> subSector;
+
     explicit BSPNode(const Wall& splitter) : splitter(splitter) {}
 
     int frontCount = 0, backCount = 0, spanningCount = 0;
@@ -29,5 +33,7 @@ struct BSPNode {
 
 std::unique_ptr<BSPNode> BuildBSP(const std::vector<Wall>& walls);
 void CollectBSPWalls(BSPNode* node, const Vector2& playerPos, std::vector<Wall>& outWalls);
+void BuildSubSectors(BSPNode* root, const std::vector<SectorPolygon>& sectorPolygons);
+int FindSector(const BSPNode* node, const Vector2& playerPos);
 
 #endif //TILKYENGINE_BSP_H

@@ -80,6 +80,66 @@ static int ScoreSplitter(const std::vector<Wall>& walls, size_t splitterIndex) {
     return std::abs(frontCount - backCount) + spanningCount * 8;
 }
 
+static std::vector<Vector2> RemoveNearDuplicateVertices(const std::vector<Vector2>& poly) {
+    std::vector<Vector2> out;
+    out.reserve(poly.size());
+    for (const Vector2& v : poly) {
+        if (out.empty() || (v - out.back()).Dot(v - out.back()) > EPSILON * EPSILON) out.push_back(v);
+    }
+
+    if (out.size() >= 2) {
+        Vector2 diff = out.front() - out.back();
+        if (diff.Dot(diff) < EPSILON * EPSILON) out.pop_back();
+    }
+
+    return out;
+}
+
+static std::pair<std::vector<Vector2>, std::vector<Vector2>> SplitPolygonByLine(const std::vector<Vector2>& poly, const Wall& splitter) {
+    std::vector<Vector2> frontPoly, backPoly;
+    if (poly.size() < 3) return {frontPoly, backPoly};
+
+    for (size_t i = 0; i < poly.size(); i++) {
+        const Vector2 current = poly[i];
+        const Vector2 next = poly[(i + 1) % poly.size()];
+        const float currentSide = PointSide(splitter, current);
+        const float nextSide = PointSide(splitter, next);
+        const bool currentFront = currentSide >= -EPSILON;
+        const bool currentBack = currentSide <= EPSILON;
+        const bool crosses = (currentSide > EPSILON && nextSide < -EPSILON || currentSide < -EPSILON && nextSide > EPSILON);
+
+        if (currentFront) frontPoly.push_back(current);
+        if (currentBack) backPoly.push_back(current);
+        if (crosses) {
+            const float t = currentSide / (currentSide - nextSide);
+            const Vector2 intersection = current + (next - current) * t;
+            frontPoly.push_back(intersection);
+            backPoly.push_back(intersection);
+        }
+    }
+
+    frontPoly = RemoveNearDuplicateVertices(frontPoly);
+    backPoly = RemoveNearDuplicateVertices(backPoly);
+
+    return {frontPoly, backPoly};
+}
+
+static void AddPolygonToLeaves(BSPNode* node, const std::vector<Vector2>& polygon, int sectorId) {
+    if (!node || polygon.size() < 3) return;
+
+    if (node->isLeaf) {
+        if (!node->subSector) {
+            node->subSector = std::make_unique<SubSector>();
+            node->subSector->sectorId = sectorId;
+            node->subSector->polygon = polygon;
+        }
+        return;
+    }
+    auto [frontPoly, backPoly] = SplitPolygonByLine(polygon, node->splitter);
+    if (!frontPoly.empty()) AddPolygonToLeaves(node->front.get(), frontPoly, sectorId);
+    if (!backPoly.empty()) AddPolygonToLeaves(node->back.get(), backPoly, sectorId);
+}
+
 std::unique_ptr<BSPNode> BuildBSP(const std::vector<Wall>& walls) {
     if (walls.empty()) return nullptr;
 
@@ -128,14 +188,48 @@ std::unique_ptr<BSPNode> BuildBSP(const std::vector<Wall>& walls) {
         }
     }
 
-    node->front = BuildBSP(frontWalls);
-    node->back = BuildBSP(backWalls);
+    if (frontWalls.empty()) {
+        node->front = std::make_unique<BSPNode>(node->splitter);
+        node->front->isLeaf = true;
+    }
+    else node->front = BuildBSP(frontWalls);
+    if (backWalls.empty()) {
+        node->back = std::make_unique<BSPNode>(node->splitter);
+        node->back->isLeaf = true;
+    }
+    else node->back = BuildBSP(backWalls);
 
     return node;
 }
 
+void BuildSubSectors(BSPNode* root, const std::vector<SectorPolygon>& sectorPolygons) {
+    if (!root) return;
+
+    for (const SectorPolygon& polygon : sectorPolygons) AddPolygonToLeaves(root, polygon.vertices, polygon.sectorId);
+}
+
+const SubSector* FindSubSector(const BSPNode* node, const Vector2& playerPos) {
+    const BSPNode* current = node;
+
+    while (current && !current->isLeaf) {
+        const float side = PointSide(current->splitter, playerPos);
+
+        if (side >= 0.0f) current = current->front.get();
+        else current = current->back.get();
+    }
+
+    if (!current || !current->subSector) return nullptr;
+    return current->subSector.get();
+}
+
+int FindSector(const BSPNode* node, const Vector2& playerPos) {
+    const SubSector* subSector = FindSubSector(node, playerPos);
+    if (!subSector) return -1;
+    return subSector->sectorId;
+}
+
 void CollectBSPWalls(BSPNode* node, const Vector2& playerPos, std::vector<Wall>& outWalls) {
-    if (!node) return;
+    if (!node || node->isLeaf) return;
 
     const float side = PointSide(node->splitter, playerPos);
 
