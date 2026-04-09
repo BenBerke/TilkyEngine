@@ -60,12 +60,9 @@ namespace Renderer {
     static Vector2 screenCentre = {SCREEN_WIDTH * .5f, SCREEN_HEIGHT * .5f};
 
     constexpr float nearPlane = 0.01f;
-    constexpr float wallBottom = 0.0f;
-    constexpr float wallTop = 64.0f;
-    constexpr float eyeHeight = 32.0f;
     static double projectionScale = SCREEN_WIDTH * .5f / std::tan(fovInRadians * .5f);
 
-    void UpdateFrame(const Player &player, const std::vector<Wall> &walls) {
+    void UpdateFrame(const Player &player, const std::vector<Wall> &walls, const std::vector<Sector> &sectors) {
         timer = GameTime::time;
 
         const Vector2 pos = player.GetPosition();
@@ -113,28 +110,52 @@ namespace Renderer {
 
             if ((startScreenX < 0.0f && endScreenX < 0.0f) || (startScreenX >= SCREEN_WIDTH && endScreenX >= SCREEN_WIDTH)) continue;
 
-            float startYTop = screenCentre.y - ((wallTop - eyeHeight) / startCamZ) * projectionScale;
-            float startYBot = screenCentre.y - ((wallBottom - eyeHeight) / startCamZ) * projectionScale;
-            float endYTop = screenCentre.y - ((wallTop - eyeHeight) / endCamZ) * projectionScale;
-            float endYBot = screenCentre.y - ((wallBottom - eyeHeight) / endCamZ) * projectionScale;
+            auto DrawWallSection = [&](const float top, const float bot) {
+                float startYTop = screenCentre.y - ((top - player.GetCurrentEyeHeight()) / startCamZ) * projectionScale;
+                float startYBot = screenCentre.y - ((bot - player.GetCurrentEyeHeight()) / startCamZ) * projectionScale;
+                float endYTop = screenCentre.y - ((top - player.GetCurrentEyeHeight()) / endCamZ) * projectionScale;
+                float endYBot = screenCentre.y - ((bot - player.GetCurrentEyeHeight()) / endCamZ) * projectionScale;
 
-            if (startScreenX > endScreenX) {
-                std::swap(startScreenX, endScreenX);
-                std::swap(startYTop, endYTop);
-                std::swap(startYBot, endYBot);
-            }
+                double localStartScreenX = startScreenX;
+                double localEndScreenX = endScreenX;
 
-            int xStart = std::max(0, static_cast<int>(std::ceil(startScreenX)));
-            int xEnd = std::min(SCREEN_WIDTH - 1, static_cast<int>(std::floor(endScreenX)));
+                if (localStartScreenX > localEndScreenX) {
+                    std::swap(localStartScreenX, localEndScreenX);
+                    std::swap(startYTop, endYTop);
+                    std::swap(startYBot, endYBot);
+                }
 
-            if (xStart > xEnd) continue;
+                int xStart = std::max(0, static_cast<int>(std::ceil(localStartScreenX)));
+                int xEnd = std::min(SCREEN_WIDTH - 1, static_cast<int>(std::floor(localEndScreenX)));
 
-            for (int x = xStart; x <= xEnd; x++) {
-                float t = endScreenX == startScreenX ? 0.0f : (x - startScreenX) / (endScreenX - startScreenX);
-                float yTop = startYTop + (endYTop - startYTop) * t;
-                float yBot = startYBot + (endYBot - startYBot) * t;
+                if (xStart > xEnd) return;
+
                 SDL_SetRenderDrawColor(renderer, wall.color.x, wall.color.y, wall.color.z, 255);
-                DrawLine({static_cast<float>(x), yTop}, {static_cast<float>(x), yBot});
+
+                for (int x = xStart; x <= xEnd; x++) {
+                    float t = localEndScreenX == localStartScreenX ? 0.0f : (x - localStartScreenX) / (localEndScreenX - localStartScreenX);
+                    float yTop = startYTop + (endYTop - startYTop) * t;
+                    float yBot = startYBot + (endYBot - startYBot) * t;
+                    DrawLine({static_cast<float>(x), yTop}, {static_cast<float>(x), yBot});
+                }
+            };
+
+            const bool validFront = wall.frontSector != -1;
+            const bool validBack = wall.backSector != -1;
+            if (validFront && !validBack) {
+                const Sector& front = sectors[wall.frontSector];
+                DrawWallSection(front.ceilHeight, front.floorHeight);
+            }
+            else if (!validFront && validBack) {
+                const Sector& back = sectors[wall.backSector];
+                DrawWallSection(back.ceilHeight, back.floorHeight);
+            }
+            else if (validFront && validBack) {
+                const Sector& front = sectors[wall.frontSector];
+                const Sector& back = sectors[wall.backSector];
+
+                if (back.ceilHeight < front.ceilHeight) DrawWallSection(front.ceilHeight, back.ceilHeight);
+                if (back.floorHeight > front.floorHeight) DrawWallSection(back.floorHeight, front.floorHeight);
             }
         }
 

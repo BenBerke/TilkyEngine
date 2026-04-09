@@ -10,11 +10,12 @@
 struct Wall {
     Vector2 start, end;
     Vector3 color;
+    int frontSector = -1, backSector = -1;
 
     Vector2 dir, normal;
     float lengthSq;
-    Wall(const Vector2& start, const Vector2& end, const Vector3& color)
-           : start(start), end(end), color(color) {
+    Wall(const Vector2& start, const Vector2& end, const Vector3& color, const int fs = -1, const int bs = -1) :
+    start(start), end(end), color(color), frontSector(fs), backSector(bs) {
         dir = end - start;
         lengthSq = dir.Dot(dir);
 

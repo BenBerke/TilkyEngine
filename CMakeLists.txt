@@ -24,6 +24,7 @@ add_executable(TilkyEngine
         src/Renderer/Renderer.cpp
         Headers/Renderer/BSP.h
         src/Renderer/BSP.cpp
+        Headers/Objects/Sector.h
 )
 
 target_link_libraries(TilkyEngine PRIVATE

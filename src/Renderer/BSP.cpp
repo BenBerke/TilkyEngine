@@ -42,12 +42,12 @@ static std::pair<Wall, Wall> SplitWall(const Wall& splitter, const Wall& wall) {
     const Vector2 intersection = wall.start + wall.dir * t;
 
     if (d1 > 0.0f) {
-        Wall frontPart{wall.start, intersection, wall.color};
-        Wall backPart{intersection, wall.end, wall.color};
+        Wall frontPart{wall.start, intersection, wall.color, wall.frontSector, wall.backSector};
+        Wall backPart{intersection, wall.end, wall.color, wall.frontSector, wall.backSector};
         return {frontPart, backPart};
     } else {
-        Wall backPart{wall.start, intersection, wall.color};
-        Wall frontPart{intersection, wall.end, wall.color};
+        Wall backPart{wall.start, intersection, wall.color, wall.frontSector, wall.backSector};
+        Wall frontPart{intersection, wall.end, wall.color, wall.frontSector, wall.backSector};
         return {frontPart, backPart};
     }
 }
